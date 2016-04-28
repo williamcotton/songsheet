@@ -1,0 +1,26 @@
+{
+  "name": "songsheet",
+  "version": "1.0.0",
+  "description": "A songsheet interpreter",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/williamcotton/songsheet.git"
+  },
+  "keywords": [
+    "music",
+    "chord",
+    "lyrics",
+    "songsheet",
+    "interpreter"
+  ],
+  "author": "William Cotton",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/williamcotton/songsheet/issues"
+  },
+  "homepage": "https://github.com/williamcotton/songsheet#readme"
+}
