@@ -101,25 +101,42 @@ module.exports = () => (data) => new Promise((resolve, reject) => {
     }
   }
 
-  sections.forEach(section => {
-    const lyrics = getLyrics({section})
-    const chords = getChords({section})
-    const sectionType = getSectionType({section, lyrics, chords, verses, chorus, bridge})
+  const getSectionIndex = (sectionType, structureIndex) => {
+    return structure.reduce((count, _sectionType, index) => {
+      if (_sectionType === sectionType && index < structureIndex) count++
+      return count
+    }, 0)
+  }
+
+  sections.forEach((section, structureIndex) => {
+    let lyrics = getLyrics({section})
+    let chords = getChords({section})
+    let sectionType = getSectionType({section, lyrics, chords, verses, chorus, bridge})
+
+    if (!sectionType) return
+
+    const sectionCount = Array.isArray(sectionType) ? sectionType.length : 0
 
     if (sectionType === 'verse') {
       verses.push({lyrics, chords})
-    } else if (sectionType === 'chorus' && !chorus) {
-      chorus = {lyrics, chords}
-    } else if (sectionType === 'bridge' && !bridge) {
-      bridge = {lyrics, chords}
+    } else if (sectionType === 'chorus' || (sectionType && sectionType[0] === 'chorus')) {
+      if (!chorus) chorus = {lyrics, chords}
+      lyrics = chorus.lyrics
+      chords = chorus.chords
+    } else if (sectionType === 'bridge') {
+      if (!bridge) bridge = {lyrics, chords}
+      lyrics = bridge.lyrics
+      chords = bridge.chords
     }
 
-    if (sectionType) {
-      if (typeof structure.concat === 'function') {
-        structure = structure.concat(sectionType)
-      } else {
-        structure.push(sectionType)
-      }
+    const sectionIndex = getSectionIndex(sectionType, structureIndex)
+
+    if (sectionCount > 0) {
+      sectionType.forEach(() => {
+        structure = structure.concat({ sectionType: sectionType[0], lyrics, chords, sectionIndex })
+      })
+    } else {
+      structure = structure.concat({ sectionType, lyrics, chords, sectionIndex })
     }
   })
 

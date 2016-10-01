@@ -11,7 +11,7 @@ test('songsheet', function (t) {
       .then(({title, author, structure}) => {
         t.equal(title, 'SLEEPING ON THE ROAD')
         t.equal(author, 'WILLIE COTTON')
-        t.deepEqual(structure, ['verse', 'chorus', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'verse', 'chorus', 'instrumental', 'bridge'])
+        t.deepEqual(structure.map(s => s.sectionType), ['verse', 'chorus', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'verse', 'chorus', 'instrumental', 'bridge'])
       })
       .then(t.end)
   })
@@ -21,7 +21,7 @@ test('songsheet', function (t) {
       .then(({title, author, structure}) => {
         t.equal(title, 'RIOT ON A SCREEN')
         t.equal(author, 'WILLIE COTTON')
-        t.deepEqual(structure, ['verse', 'chorus', 'fill', 'verse', 'chorus', 'chorus', 'instrumental', 'chorus', 'chorus', 'fill'])
+        t.deepEqual(structure.map(s => s.sectionType), ['verse', 'chorus', 'fill', 'verse', 'chorus', 'chorus', 'instrumental', 'chorus', 'chorus', 'fill'])
       })
       .then(t.end)
   })
@@ -31,7 +31,7 @@ test('songsheet', function (t) {
       .then(({title, author, structure, otherSections: {prechorus: {chords, lyrics}}}) => {
         t.equal(title, 'SPENT SOME TIME IN BUFFALO')
         t.equal(author, 'WILLIE COTTON')
-        t.deepEqual(structure, ['verse', 'verse', 'prechorus', 'chorus', 'verse', 'prechorus', 'chorus', 'instrumental', 'prechorus', 'chorus'])
+        t.deepEqual(structure.map(s => s.sectionType), ['verse', 'verse', 'prechorus', 'chorus', 'verse', 'prechorus', 'chorus', 'instrumental', 'prechorus', 'chorus'])
         t.deepEqual(chords, ['D'])
         t.deepEqual(lyrics, [' Spent some time in Buffalo', ' Dug my life out of the snow', ' And when those lake winds start to blow', ' I\'ve had my fill it\'s time to go'])
       })
