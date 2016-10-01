@@ -1,18 +1,17 @@
-const { Map, List } = require('immutable')
+const { Map, List, fromJS } = require('immutable')
 
 const isCaps = string => string.toUpperCase() === string
 
 const getLyrics = ({rawSection}) => {
   const lines = rawSection.split('\n')
   if (lines.length === 1 && isCaps(lines[0])) {
-    return false
+    return []
   }
   const lyrics = []
   lines.forEach(line => {
-    if (isCaps(line)) {
-      return
+    if (!isCaps(line)) {
+      lyrics.push(line)
     }
-    lyrics.push(line)
   })
   return lyrics
 }
@@ -20,12 +19,12 @@ const getLyrics = ({rawSection}) => {
 const getChords = ({rawSection}) => {
   const lines = rawSection.split('\n')
   if (lines.length === 1 && isCaps(lines[0])) {
-    return false
+    return []
   }
   const chords = []
   lines.forEach(line => {
     if (!isCaps(line) || /.*[A-Z]:/.test(line)) {
-      return
+      return []
     }
     chords.push(line)
   })
@@ -111,13 +110,13 @@ module.exports = () => (rawSongsheet) => new Promise((resolve, reject) => {
     sectionTypes.forEach(sectionType => {
       const section = song.get('sections').get(sectionType)
 
-      const lyrics = !presentLyrics && section && section.get('lyrics')
+      const lyrics = presentLyrics.length === 0 && section && section.get('lyrics')
         ? section.get('lyrics')
-        : presentLyrics
+        : fromJS(presentLyrics)
 
-      const chords = !presentChords && section && section.get('chords')
+      const chords = presentChords.length === 0 && section && section.get('chords')
         ? section.get('chords')
-        : presentChords
+        : fromJS(presentChords)
 
       const info = !presentInfo && section && section.get('info')
         ? section.get('info')
