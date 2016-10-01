@@ -99,13 +99,15 @@ const getSectionType = ({rawSection, lyrics, chords, song}) => {
   }
 }
 
-module.exports = () => (songData, song) => new Promise((resolve, reject) => {
-  const rawSections = songData.replace('\r\n', '\n').replace(/^\s*\n/gm, '\n').split('\n\n')
+module.exports = () => (rawSongsheet) => new Promise((resolve, reject) => {
+  const rawSections = rawSongsheet.replace('\r\n', '\n').replace(/^\s*\n/gm, '\n').split('\n\n')
   resolve(rawSections.reduce((song, rawSection, structureIndex) => {
     let presentLyrics = getLyrics({rawSection})
     let presentChords = getChords({rawSection})
     let presentInfo = getInfo({rawSection})
+
     const sectionTypes = getSectionType({rawSection, lyrics: presentLyrics, chords: presentChords, song}) || []
+
     sectionTypes.forEach(sectionType => {
       const section = song.get('sections').get(sectionType)
 
@@ -130,8 +132,9 @@ module.exports = () => (songData, song) => new Promise((resolve, reject) => {
       song = song.updateIn(['sections', sectionType, 'count'], count => count + 1)
       song = song.updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, sectionIndex, info })))
     })
+
     return song
-  }, song || Map({
+  }, Map({
     title: rawSections[0].split(' - ')[0],
     author: rawSections[0].split(' - ')[1],
     structure: List(),
