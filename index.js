@@ -122,14 +122,11 @@ module.exports = () => (rawSongsheet) => new Promise((resolve, reject) => {
         ? section.get('info')
         : presentInfo
 
-      song = !section
+      song = (!section
         ? song.mergeDeepIn(['sections', sectionType], {lyrics, chords, info, count: 0})
-        : song
-
-      const sectionIndex = song.getIn(['sections', sectionType, 'count'])
-
-      song = song.updateIn(['sections', sectionType, 'count'], count => count + 1)
-      song = song.updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, sectionIndex, info })))
+        : song)
+        .updateIn(['sections', sectionType, 'count'], count => count + 1)
+        .updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, sectionIndex: song.getIn(['sections', sectionType, 'count']) || 0, info })))
     })
 
     return song
