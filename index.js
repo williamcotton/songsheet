@@ -65,8 +65,9 @@ module.exports = () => (data) => new Promise((resolve, reject) => {
     } else {
       // if LABEL: - defines and gives a section a label
       if (/.*[A-Z]:/.test(section)) {
-        const sectionTitle = section.match(/.*[A-Z]:/)[0].split(':')[0].toLowerCase()
-        otherSections[sectionTitle] = {lyrics, chords}
+        const [, SECTION_TITLE, info] = section.match(/(.*[A-Z]):(.*)/)
+        const sectionTitle = SECTION_TITLE.toLowerCase()
+        otherSections[sectionTitle] = {lyrics, chords, info}
         return sectionTitle
       }
 
@@ -96,7 +97,7 @@ module.exports = () => (data) => new Promise((resolve, reject) => {
       // if LABEL matches on previously defined LABEL:
       if (section.toLowerCase() && otherSections[section.toLowerCase()]) return section.toLowerCase()
 
-      // other wise it's a verse
+      // otherwise it's a verse
       if (lyrics && chords.length === 0) return 'verse'
     }
   }

@@ -18,9 +18,10 @@ test('songsheet', function (t) {
 
   t.test('parse riot-on-a-screen', t => {
     loadSongsheet('./riot-on-a-screen.txt')
-      .then(({title, author, structure}) => {
+      .then(({title, author, structure, otherSections}) => {
         t.equal(title, 'RIOT ON A SCREEN')
         t.equal(author, 'WILLIE COTTON')
+        t.equal(otherSections.fill.info, ' D G D A D')
         t.deepEqual(structure.map(s => s.sectionType), ['verse', 'chorus', 'fill', 'verse', 'chorus', 'chorus', 'instrumental', 'chorus', 'chorus', 'fill'])
       })
       .then(t.end)
