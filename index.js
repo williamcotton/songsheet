@@ -101,13 +101,13 @@ const getSectionType = ({rawSection, lyrics, chords, song}) => {
 module.exports = () => (rawSongsheet) => new Promise((resolve, reject) => {
   const rawSections = rawSongsheet.replace('\r\n', '\n').replace(/^\s*\n/gm, '\n').split('\n\n')
   resolve(rawSections.reduce((song, rawSection, structureIndex) => {
-    let presentLyrics = getLyrics({rawSection})
-    let presentChords = getChords({rawSection})
-    let presentInfo = getInfo({rawSection})
+    const presentLyrics = getLyrics({rawSection})
+    const presentChords = getChords({rawSection})
+    const presentInfo = getInfo({rawSection})
 
     const sectionTypes = getSectionType({rawSection, lyrics: presentLyrics, chords: presentChords, song}) || []
 
-    sectionTypes.forEach(sectionType => {
+    return sectionTypes.reduce((song, sectionType) => {
       const section = song.get('sections').get(sectionType)
 
       const lyrics = presentLyrics.length === 0 && section && section.get('lyrics')
@@ -122,14 +122,12 @@ module.exports = () => (rawSongsheet) => new Promise((resolve, reject) => {
         ? section.get('info')
         : presentInfo
 
-      song = (!section
+      return (!section
         ? song.mergeDeepIn(['sections', sectionType], {lyrics, chords, info, count: 0})
         : song)
         .updateIn(['sections', sectionType, 'count'], count => count + 1)
         .updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, sectionIndex: song.getIn(['sections', sectionType, 'count']) || 0, info })))
-    })
-
-    return song
+    }, song)
   }, Map({
     title: rawSections[0].split(' - ')[0],
     author: rawSections[0].split(' - ')[1],
