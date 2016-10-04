@@ -2,7 +2,7 @@ const { Map, List, fromJS } = require('immutable')
 
 const isCaps = string => string.toUpperCase() === string
 
-const getLyrics = ({rawSection}) => {
+const getLyrics = ({ rawSection }) => {
   const lines = rawSection.split('\n')
   if (lines.length === 1 && isCaps(lines[0])) {
     return []
@@ -31,14 +31,14 @@ const getChords = ({rawSection}) => {
   return chords
 }
 
-const getInfo = ({rawSection}) => {
+const getInfo = ({ rawSection }) => {
   if (/.*[A-Z]:/.test(rawSection)) {
     const [, info] = rawSection.match(/.*[A-Z]:(.*)/)
     return info
   }
 }
 
-const getSectionType = ({rawSection, lyrics, chords, song}) => {
+const getSectionType = ({ rawSection, lyrics, chords, song }) => {
   // (1st, 2nd, 3rd, and all remaining ordering from cascading logic of !chorus, !bridge, verses.length >= 1)
 
   const sections = song.get('sections')
@@ -101,11 +101,11 @@ const getSectionType = ({rawSection, lyrics, chords, song}) => {
 module.exports = () => (rawSongsheet) => new Promise((resolve, reject) => {
   const rawSections = rawSongsheet.replace('\r\n', '\n').replace(/^\s*\n/gm, '\n').split('\n\n')
   resolve(rawSections.reduce((song, rawSection, structureIndex) => {
-    const presentLyrics = getLyrics({rawSection})
-    const presentChords = getChords({rawSection})
-    const presentInfo = getInfo({rawSection})
+    const presentLyrics = getLyrics({ rawSection })
+    const presentChords = getChords({ rawSection })
+    const presentInfo = getInfo({ rawSection })
 
-    const sectionTypes = getSectionType({rawSection, lyrics: presentLyrics, chords: presentChords, song}) || []
+    const sectionTypes = getSectionType({ rawSection, lyrics: presentLyrics, chords: presentChords, song }) || []
 
     return sectionTypes.reduce((song, sectionType) => {
       const section = song.get('sections').get(sectionType)
@@ -132,6 +132,7 @@ module.exports = () => (rawSongsheet) => new Promise((resolve, reject) => {
     title: rawSections[0].split(' - ')[0],
     author: rawSections[0].split(' - ')[1],
     structure: List(),
-    sections: Map({})
+    sections: Map({}),
+    rawSongsheet
   })))
 })
