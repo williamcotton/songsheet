@@ -62,4 +62,68 @@ test('songsheet', function (t) {
       .then(t.end)
       .catch(console.log)
   })
+
+  t.test('parse song-of-myself', t => {
+    loadSongsheet('./song-of-myself.txt')
+      .then((song) => {
+        t.equal(song.get('title'), 'SONG OF MYSELF')
+        t.equal(song.get('author'), 'WILLIE AND WALT')
+        t.equal(song.getIn(['sections', 'verse', 'count']), 1)
+        t.equal(song.getIn(['sections', 'chorus', 'count']), 1)
+        t.equal(song.getIn(['sections', 'bridge', 'count']), 1)
+        const structure = song.get('structure')
+        t.deepEqual(structure.map(s => s.get('sectionIndex')).toArray(), [ 0, 0, 0 ])
+        t.deepEqual(structure.map(s => s.get('chords').size).toArray(), [ 3, 4, 2 ])
+        t.deepEqual(structure.map(s => s.get('lyrics').size).toArray(), [ 4, 4, 2 ])
+        t.deepEqual(structure.map(s => !!s.get('info')).toArray(), [ false, false, false ])
+        t.deepEqual(structure.map(s => s.get('sectionType')).toArray(), [ 'verse', 'chorus', 'bridge' ])
+        t.deepEqual(song.getIn(['sections', 'verse', 'chords']).toArray(), [ '       G                           Am', '    C                             G', '    F        C                            G' ])
+        t.deepEqual(song.getIn(['sections', 'chorus', 'chords']).toArray(), [ '          G                             C        G', '    D                          C        G ', '         G                                 C        G', '    D                            C        G' ])
+        t.deepEqual(song.getIn(['sections', 'bridge', 'chords']).toArray(), [ 'C        ', '                                 G' ])
+      })
+      .then(t.end)
+      .catch(console.log)
+  })
+
+  t.test('chord line regular expressions', t => {
+    const { chordRegExp, wordRegExp, isChordLine } = songsheet
+
+    const line00 = '   A      G    '
+    const line01 = '   A      G    Bm   '
+    const line02 = '   A      G    Bk   '
+    const line03 = 'A      G'
+    const line04 = 'A      G    '
+    const line05 = '    A      G'
+    const line06 = 'This Is A Test Of Things'
+    const line07 = 'Bm B# B+ Bb B7'
+
+    t.deepEqual(line00.match(chordRegExp), [ 'A', 'G' ])
+    t.deepEqual(line01.match(chordRegExp), [ 'A', 'G', 'Bm' ])
+    t.deepEqual(line02.match(chordRegExp), [ 'A', 'G' ])
+    t.deepEqual(line03.match(chordRegExp), [ 'A', 'G' ])
+    t.deepEqual(line04.match(chordRegExp), [ 'A', 'G' ])
+    t.deepEqual(line05.match(chordRegExp), [ 'A', 'G' ])
+    t.deepEqual(line06.match(chordRegExp), [ 'A' ])
+    t.deepEqual(line07.match(chordRegExp), [ 'Bm', 'B#', 'B+', 'Bb', 'B7' ])
+    
+    t.deepEqual(line00.match(wordRegExp), [ 'A', 'G' ])
+    t.deepEqual(line01.match(wordRegExp), [ 'A', 'G', 'Bm' ])
+    t.deepEqual(line02.match(wordRegExp), [ 'A', 'G', 'Bk' ])
+    t.deepEqual(line03.match(wordRegExp), [ 'A', 'G' ])
+    t.deepEqual(line04.match(wordRegExp), [ 'A', 'G' ])
+    t.deepEqual(line05.match(wordRegExp), [ 'A', 'G' ])
+    t.deepEqual(line06.match(wordRegExp), [ 'This', 'Is', 'A', 'Test', 'Of', 'Things' ])
+    t.deepEqual(line07.match(wordRegExp), [ 'Bm', 'B#', 'B+', 'Bb', 'B7' ])
+
+    t.equal(isChordLine(line00), true)
+    t.equal(isChordLine(line01), true)
+    t.equal(isChordLine(line02), false)
+    t.equal(isChordLine(line03), true)
+    t.equal(isChordLine(line04), true)
+    t.equal(isChordLine(line05), true)
+    t.equal(isChordLine(line06), false)
+    t.equal(isChordLine(line07), true)
+
+    t.end()
+  })
 })

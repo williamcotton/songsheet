@@ -2,6 +2,13 @@ const { Map, List, fromJS } = require('immutable')
 
 const isCaps = string => string.toUpperCase() === string
 
+const chordRegExp = /[A-G][mb#\+7]|[A-G]\b/g // http://regexr.com/3eeoo
+const wordRegExp = /[A-Za-z#\+7]+/g // http://regexr.com/3eeor
+
+const isChordLine = string => string.match(chordRegExp) && string.match(wordRegExp)
+  ? string.match(chordRegExp).length === string.match(wordRegExp).length
+  : false
+
 const getLyrics = ({ rawSection }) => {
   const lines = rawSection.split('\n')
   if (lines.length === 1 && isCaps(lines[0])) {
@@ -23,7 +30,7 @@ const getChords = ({rawSection}) => {
   }
   const chords = []
   lines.forEach(line => {
-    if (!isCaps(line) || /.*[A-Z]:/.test(line)) {
+    if (!isChordLine(line) || /.*[A-Z]:/.test(line)) {
       return []
     }
     chords.push(line)
@@ -98,41 +105,49 @@ const getSectionType = ({ rawSection, lyrics, chords, song }) => {
   }
 }
 
-module.exports = () => (rawSongsheet) => new Promise((resolve, reject) => {
-  const rawSections = rawSongsheet.replace('\r\n', '\n').replace(/^\s*\n/gm, '\n').split('\n\n')
-  resolve(rawSections.reduce((song, rawSection, structureIndex) => {
-    const presentLyrics = getLyrics({ rawSection })
-    const presentChords = getChords({ rawSection })
-    const presentInfo = getInfo({ rawSection })
+module.exports = () => {
+  const songsheet = (rawSongsheet) => new Promise((resolve, reject) => {
+    const rawSections = rawSongsheet.replace('\r\n', '\n').replace(/^\s*\n/gm, '\n').split('\n\n')
+    resolve(rawSections.reduce((song, rawSection, structureIndex) => {
+      const presentLyrics = getLyrics({ rawSection })
+      const presentChords = getChords({ rawSection })
+      const presentInfo = getInfo({ rawSection })
 
-    const sectionTypes = getSectionType({ rawSection, lyrics: presentLyrics, chords: presentChords, song }) || []
+      const sectionTypes = getSectionType({ rawSection, lyrics: presentLyrics, chords: presentChords, song }) || []
 
-    return sectionTypes.reduce((song, sectionType) => {
-      const section = song.get('sections').get(sectionType)
+      return sectionTypes.reduce((song, sectionType) => {
+        const section = song.get('sections').get(sectionType)
 
-      const lyrics = presentLyrics.length === 0 && section && section.get('lyrics')
-        ? section.get('lyrics')
-        : fromJS(presentLyrics)
+        const lyrics = presentLyrics.length === 0 && section && section.get('lyrics')
+          ? section.get('lyrics')
+          : fromJS(presentLyrics)
 
-      const chords = presentChords.length === 0 && section && section.get('chords')
-        ? section.get('chords')
-        : fromJS(presentChords)
+        const chords = presentChords.length === 0 && section && section.get('chords')
+          ? section.get('chords')
+          : fromJS(presentChords)
 
-      const info = !presentInfo && section && section.get('info')
-        ? section.get('info')
-        : presentInfo
+        const info = !presentInfo && section && section.get('info')
+          ? section.get('info')
+          : presentInfo
 
-      return (!section
-        ? song.mergeDeepIn(['sections', sectionType], {lyrics, chords, info, count: 0})
-        : song)
-        .updateIn(['sections', sectionType, 'count'], count => count + 1)
-        .updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, sectionIndex: song.getIn(['sections', sectionType, 'count']) || 0, info })))
-    }, song)
-  }, Map({
-    title: rawSections[0].split(' - ')[0],
-    author: rawSections[0].split(' - ')[1],
-    structure: List(),
-    sections: Map({}),
-    rawSongsheet
-  })))
-})
+        return (!section
+          ? song.mergeDeepIn(['sections', sectionType], {lyrics, chords, info, count: 0})
+          : song)
+          .updateIn(['sections', sectionType, 'count'], count => count + 1)
+          .updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, sectionIndex: song.getIn(['sections', sectionType, 'count']) || 0, info })))
+      }, song)
+    }, Map({
+      title: rawSections[0].split(' - ')[0],
+      author: rawSections[0].split(' - ')[1],
+      structure: List(),
+      sections: Map({}),
+      rawSongsheet
+    })))
+  })
+
+  songsheet.chordRegExp = chordRegExp
+  songsheet.wordRegExp = wordRegExp
+  songsheet.isChordLine = isChordLine
+
+  return songsheet
+}
