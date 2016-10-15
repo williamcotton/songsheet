@@ -16,7 +16,7 @@ const getLyrics = ({ rawSection }) => {
   }
   const lyrics = []
   lines.forEach(line => {
-    if (!isCaps(line)) {
+    if (!isChordLine(line) && !isCaps(line)) {
       lyrics.push(line)
     }
   })
@@ -30,10 +30,10 @@ const getChords = ({rawSection}) => {
   }
   const chords = []
   lines.forEach(line => {
-    if (!isChordLine(line) || /.*[A-Z]:/.test(line)) {
-      return []
+    if (isChordLine(line)) {
+      chords.push(line)
     }
-    chords.push(line)
+    
   })
   return chords
 }
