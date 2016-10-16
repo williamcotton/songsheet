@@ -8,14 +8,16 @@ const loadSongsheet = (file) => fs.readFile(file, 'utf8').then(songsheet)
 test('songsheet', function (t) {
   t.test('parse sleeping-on-the-road', t => {
     loadSongsheet('./sleeping-on-the-road.txt')
-      .then((song) => {
+      .then(song => {
         t.equal(song.get('title'), 'SLEEPING ON THE ROAD')
         t.equal(song.get('author'), 'WILLIE COTTON')
         t.equal(song.getIn(['sections', 'verse', 'count']), 4)
         t.equal(song.getIn(['sections', 'chorus', 'count']), 4)
         const structure = song.get('structure')
         t.deepEqual(structure.map(s => s.get('sectionIndex')).toArray(), [ 0, 0, 1, 1, 2, 2, 0, 3, 3, 0, 1 ])
-        t.deepEqual(structure.map(s => s.get('chords').size).toArray(), [ 4, 2, 4, 2, 4, 2, 4, 4, 2, 0, 4 ])
+        t.deepEqual(structure.get(0).get('chords').toArray(), [ 'G', 'F', 'C', 'G', 'G', 'F', 'C', 'G'])
+        t.equal(structure.get(0).get('lyricLineCharacters').get(0).get(0).get('chord'), 'G')
+        t.equal(structure.get(0).get('lyricLineCharacters').get(0).get(1).get('chord'), undefined)
         t.deepEqual(structure.map(s => s.get('lyrics').size).toArray(), [ 4, 2, 4, 2, 4, 2, 4, 4, 2, 0, 4 ])
         t.deepEqual(structure.map(s => !!s.get('info')).toArray(), [ false, false, false, false, false, false, false, false, false, false, false ])
         t.deepEqual(structure.map(s => s.get('sectionType')).toArray(), ['verse', 'chorus', 'verse', 'chorus', 'verse', 'chorus', 'bridge', 'verse', 'chorus', 'instrumental', 'bridge'])
@@ -26,7 +28,7 @@ test('songsheet', function (t) {
 
   t.test('parse riot-on-a-screen', t => {
     loadSongsheet('./riot-on-a-screen.txt')
-      .then((song) => {
+      .then(song => {
         t.equal(song.get('title'), 'RIOT ON A SCREEN')
         t.equal(song.get('author'), 'WILLIE COTTON')
         t.equal(song.getIn(['sections', 'fill', 'info']), ' D G D A D')
@@ -34,7 +36,9 @@ test('songsheet', function (t) {
         t.equal(song.getIn(['sections', 'chorus', 'count']), 5)
         const structure = song.get('structure')
         t.deepEqual(structure.map(s => s.get('sectionIndex')).toArray(), [ 0, 0, 0, 1, 1, 2, 0, 3, 4, 1 ])
-        t.deepEqual(structure.map(s => s.get('chords').size).toArray(), [ 6, 5, 0, 6, 5, 5, 0, 5, 5, 0 ])
+        t.deepEqual(structure.get(0).get('chords').toArray(), [ 'D', 'G', 'D', 'A', 'D', 'D', 'G', 'D', 'A', 'D'])
+        t.equal(structure.get(0).get('lyricLineCharacters').get(0).get(0).get('chord'), 'D')
+        t.equal(structure.get(0).get('lyricLineCharacters').get(0).get(1).get('chord'), undefined)
         t.deepEqual(structure.map(s => s.get('lyrics').size).toArray(), [ 6, 5, 0, 6, 5, 5, 0, 5, 5, 0 ])
         t.deepEqual(structure.map(s => !!s.get('info')).toArray(), [ false, false, true, false, false, false, false, false, false, true ])
         t.deepEqual(structure.map(s => s.get('sectionType')).toArray(), ['verse', 'chorus', 'fill', 'verse', 'chorus', 'chorus', 'instrumental', 'chorus', 'chorus', 'fill'])
@@ -45,14 +49,16 @@ test('songsheet', function (t) {
 
   t.test('parse spent-some-time-in-buffalo', t => {
     loadSongsheet('./spent-some-time-in-buffalo.txt')
-      .then((song) => {
+      .then(song => {
         t.equal(song.get('title'), 'SPENT SOME TIME IN BUFFALO')
         t.equal(song.get('author'), 'WILLIE COTTON')
         t.equal(song.getIn(['sections', 'verse', 'count']), 3)
         t.equal(song.getIn(['sections', 'chorus', 'count']), 3)
         const structure = song.get('structure')
         t.deepEqual(structure.map(s => s.get('sectionIndex')).toArray(), [ 0, 1, 0, 0, 2, 1, 1, 0, 2, 2 ])
-        t.deepEqual(structure.map(s => s.get('chords').size).toArray(), [ 3, 3, 1, 2, 3, 1, 2, 0, 1, 2 ])
+        t.deepEqual(structure.get(0).get('chords').toArray(), [ 'D', 'G', 'A', 'C', 'D' ])
+        t.equal(structure.get(0).get('lyricLineCharacters').get(0).get(0).get('chord'), 'D')
+        t.equal(structure.get(0).get('lyricLineCharacters').get(0).get(1).get('chord'), undefined)
         t.deepEqual(structure.map(s => s.get('lyrics').size).toArray(), [ 3, 3, 4, 2, 3, 4, 2, 0, 4, 2 ])
         t.deepEqual(structure.map(s => !!s.get('info')).toArray(), [ false, false, false, false, false, false, false, false, false, false ])
         t.deepEqual(structure.map(s => s.get('sectionType')).toArray(), ['verse', 'verse', 'prechorus', 'chorus', 'verse', 'prechorus', 'chorus', 'instrumental', 'prechorus', 'chorus'])
@@ -66,7 +72,7 @@ test('songsheet', function (t) {
 
   t.test('parse song-of-myself', t => {
     loadSongsheet('./song-of-myself.txt')
-      .then((song) => {
+      .then(song => {
         t.equal(song.get('title'), 'SONG OF MYSELF')
         t.equal(song.get('author'), 'WILLIE AND WALT')
         t.equal(song.getIn(['sections', 'verse', 'count']), 1)
@@ -74,16 +80,19 @@ test('songsheet', function (t) {
         t.equal(song.getIn(['sections', 'bridge', 'count']), 1)
         const structure = song.get('structure')
         t.deepEqual(structure.map(s => s.get('sectionIndex')).toArray(), [ 0, 0, 0 ])
-        t.deepEqual(structure.map(s => s.get('chords').size).toArray(), [ 3, 4, 2 ])
+        t.deepEqual(structure.get(0).get('chords').toArray(), [ 'G', 'Am', 'C', 'G', 'F', 'C', 'G' ])
+        t.equal(structure.get(0).get('lyricLineCharacters').get(0).get(0).get('chord'), undefined)
+        t.equal(structure.get(0).get('lyricLineCharacters').get(0).get(7).get('chord'), 'G')
+        t.equal(structure.get(0).get('lyricLineCharacters').get(0).get(35).get('chord'), 'Am')
         t.deepEqual(structure.map(s => s.get('lyrics').size).toArray(), [ 3, 4, 2 ])
         t.deepEqual(structure.map(s => !!s.get('info')).toArray(), [ false, false, false ])
         t.deepEqual(structure.map(s => s.get('sectionType')).toArray(), [ 'verse', 'chorus', 'bridge' ])
         t.deepEqual(song.getIn(['sections', 'verse', 'lyrics']).toArray(), [ 'I have heard what the talkers were talking...', 'The talk of the beginning and the end,', 'But I do not talk of the beginning or the end.' ])
         t.deepEqual(song.getIn(['sections', 'chorus', 'lyrics']).toArray(), [ 'There was never any more inception than there is now,', 'Nor any more youth or age than there is now,', 'And will never be any more perfection than there is now,', 'Nor any more heaven or hell than there is now.' ])
         t.deepEqual(song.getIn(['sections', 'bridge', 'lyrics']).toArray(), [ 'Urge and urge and urge,', 'Always the procreant urge of the world.' ])
-        t.deepEqual(song.getIn(['sections', 'verse', 'chords']).toArray(), [ '       G                           Am', '    C                             G', '    F        C                            G' ])
-        t.deepEqual(song.getIn(['sections', 'chorus', 'chords']).toArray(), [ '          G                             C        G', '    D                          C        G ', '         G                                 C        G', '    D                            C        G' ])
-        t.deepEqual(song.getIn(['sections', 'bridge', 'chords']).toArray(), [ 'C        ', '                                 G' ])
+        t.deepEqual(song.getIn(['sections', 'verse', 'chords']).toArray(), [ 'G', 'Am', 'C', 'G', 'F', 'C', 'G' ])
+        t.deepEqual(song.getIn(['sections', 'chorus', 'chords']).toArray(), [ 'G', 'C', 'G', 'D', 'C', 'G', 'G', 'C', 'G', 'D', 'C', 'G' ])
+        t.deepEqual(song.getIn(['sections', 'bridge', 'chords']).toArray(), [ 'C', 'G' ])
       })
       .then(t.end)
       .catch(console.log)

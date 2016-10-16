@@ -2,8 +2,8 @@ const { Map, List, fromJS } = require('immutable')
 
 const isCaps = string => string.toUpperCase() === string
 
-const chordRegExp = /[A-G][mb#\+7]|[A-G]\b/g // http://regexr.com/3eeoo
-const wordRegExp = /[A-Za-z#\+7]+/g // http://regexr.com/3eeor
+const chordRegExp = /[A-G][mb#\+7]|[A-G]\b/g // http://regexr.com/3eep4
+const wordRegExp = /[A-Za-z#\+7]+/g // http://regexr.com/3eep7
 
 const isChordLine = string => string.match(chordRegExp) && string.match(wordRegExp)
   ? string.match(chordRegExp).length === string.match(wordRegExp).length
@@ -23,7 +23,7 @@ const getLyrics = ({ rawSection }) => {
   return lyrics
 }
 
-const getChords = ({rawSection}) => {
+const getChordLines = ({ rawSection }) => {
   const lines = rawSection.split('\n')
   if (lines.length === 1 && isCaps(lines[0])) {
     return []
@@ -36,6 +36,44 @@ const getChords = ({rawSection}) => {
     
   })
   return chords
+}
+
+const getChords = ({ rawSection }) => {
+  const chords = []
+  getChordLines({ rawSection }).forEach(line => {
+    chords.push(...line.match(chordRegExp))
+  })
+  return chords
+}
+
+const eachCharacterWithChordLine = ({ chordLine }) => (character, index) => {
+  const chordCheck = chordLine.charAt(index).match(/[A-G]/)
+
+  const chord = chordCheck
+    ? chordLine.slice(index).match(/[^ ]*/)[0]
+    : ''
+
+  return chordCheck 
+    ? { chord, character }
+    : { character }
+}
+
+const eachLyricLineWithChords = ({ chordLines }) => (lyricLine, i) => {
+  const chordLine = chordLines[i]
+
+  return chordLine
+    ? lyricLine
+        .match(/(.)/g)
+        .map(eachCharacterWithChordLine({ chordLine }))
+    : []    
+}
+
+const getLyricLineCharacters = ({ rawSection }) => {
+  const lyrics = getLyrics({ rawSection })
+  const chordLines = getChordLines({ rawSection })
+  return lyrics && chordLines
+    ? lyrics.map(eachLyricLineWithChords({ chordLines }))
+    : []
 }
 
 const getInfo = ({ rawSection }) => {
@@ -111,6 +149,7 @@ module.exports = () => {
     resolve(rawSections.reduce((song, rawSection, structureIndex) => {
       const presentLyrics = getLyrics({ rawSection })
       const presentChords = getChords({ rawSection })
+      const presentLyricLineCharacters = getLyricLineCharacters({ rawSection })
       const presentInfo = getInfo({ rawSection })
 
       const sectionTypes = getSectionType({ rawSection, lyrics: presentLyrics, chords: presentChords, song }) || []
@@ -126,15 +165,19 @@ module.exports = () => {
           ? section.get('chords')
           : fromJS(presentChords)
 
+        const lyricLineCharacters = presentLyrics.length === 0 && section && section.get('lyricLineCharacters')
+          ? section.get('lyricLineCharacters')
+          : fromJS(presentLyricLineCharacters)
+
         const info = !presentInfo && section && section.get('info')
           ? section.get('info')
           : presentInfo
 
         return (!section
-          ? song.mergeDeepIn(['sections', sectionType], {lyrics, chords, info, count: 0})
+          ? song.mergeDeepIn(['sections', sectionType], { lyrics, chords, info, lyricLineCharacters, count: 0 })
           : song)
           .updateIn(['sections', sectionType, 'count'], count => count + 1)
-          .updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, sectionIndex: song.getIn(['sections', sectionType, 'count']) || 0, info })))
+          .updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, lyricLineCharacters, sectionIndex: song.getIn(['sections', sectionType, 'count']) || 0, info })))
       }, song)
     }, Map({
       title: rawSections[0].split(' - ')[0],
