@@ -78,12 +78,10 @@ const getChords = ({ rawSection, song }) => {
 const eachCharacterWithChordLine = ({ chordLine }) => (character, index) => {
   const chordCheck = chordLine.charAt(index).match(/[A-G]/)
 
-  const chord = chordCheck
-    ? chordLine.slice(index).match(/[^ ]*/)[0]
-    : ''
+  const [,, root, type] = chordRegExp.exec(chordLine.slice(index).match(/[^ ]*/)[0]) || [false, false, false, false]
 
   return chordCheck 
-    ? { chord, character }
+    ? { chord: { root, type }, character }
     : { character }
 }
 
