@@ -2,48 +2,77 @@ const { Map, List, fromJS } = require('immutable')
 
 const isCaps = string => string.toUpperCase() === string
 
-const chordRegExp = /[A-G][mb#\+7]|[A-G]\b/g // http://regexr.com/3eep4
-const wordRegExp = /[A-Za-z#\+7]+/g // http://regexr.com/3eep7
+const chordRegExp = /(([A-G]{1}[b#]{0,1})([\w+]*))/g // http://regexr.com/3eesm
+const wordRegExp = /([A-Za-z#\+7])+/g // http://regexr.com/3eep7
 
 const isChordLine = string => string.match(chordRegExp) && string.match(wordRegExp)
-  ? string.match(chordRegExp).length === string.match(wordRegExp).length
+  ? string.match(chordRegExp).length === string.match(wordRegExp).length && !string.match(/:/)
   : false
+
+const multiplyRegExp = /([A-Z]*|\((.*)\))\*([0-9])/ // http://regexr.com/3eero
+
+const multiplyExpand = line => {
+  const multiplyExecResults = multiplyRegExp.exec(line)
+  return multiplyExecResults 
+    ? line.replace(multiplyRegExp, 
+      `${multiplyExecResults[2] || multiplyExecResults[1]} `
+        .repeat(multiplyRegExp.exec(line)[3]))
+        .replace(/[\(\)]/g, '')
+        .slice(0, -1)
+    : line.replace(/[\(\)]/g, '')
+}
+
+const notSectionHeader = (lines) => !(lines.length === 1 && isCaps(lines[0]))
 
 const getLyrics = ({ rawSection }) => {
   const lines = rawSection.split('\n')
-  if (lines.length === 1 && isCaps(lines[0])) {
-    return []
-  }
-  const lyrics = []
-  lines.forEach(line => {
-    if (!isChordLine(line) && !isCaps(line)) {
-      lyrics.push(line)
-    }
-  })
-  return lyrics
+  
+  return notSectionHeader(lines)
+    ? lines.reduce((lyrics, line) => {
+        if (!isChordLine(line) && !isCaps(line)) {
+          lyrics.push(line)
+        }
+        return lyrics
+      }, [])
+    : []
 }
 
 const getChordLines = ({ rawSection }) => {
   const lines = rawSection.split('\n')
-  if (lines.length === 1 && isCaps(lines[0])) {
-    return []
-  }
-  const chords = []
-  lines.forEach(line => {
-    if (isChordLine(line)) {
-      chords.push(line)
-    }
-    
-  })
-  return chords
+
+  return notSectionHeader(lines)
+    ? lines.reduce((chords, line) => {
+        if (isChordLine(line)) {
+          chords.push(line)
+        }
+        return chords
+      }, [])
+    : []
 }
 
-const getChords = ({ rawSection }) => {
-  const chords = []
-  getChordLines({ rawSection }).forEach(line => {
-    chords.push(...line.match(chordRegExp))
-  })
-  return chords
+const getChords = ({ rawSection, song }) => {
+  const rawSectionLine = /.*[A-Z]:/.test(rawSection)
+    ? rawSection.match(/.*[A-Z]:(.*)/)[1]
+    : false
+
+  return rawSectionLine
+    ? multiplyExpand(rawSectionLine)
+        .match(wordRegExp)
+        .map(word => {
+          const section = song.get('sections').get(word.toLowerCase())
+          return section
+            ? section.get('chords').toArray()
+            : word
+        })
+        .reduce((a, b) => a.concat(b), []) // flatten the array
+    : getChordLines({ rawSection }).reduce((chords, line) => {
+        let match
+        while ( ( match = chordRegExp.exec(line) ) != null ) {
+          const [,, root, type] = match
+          chords.push({ root, type })
+        }
+        return chords
+      }, [])
 }
 
 const eachCharacterWithChordLine = ({ chordLine }) => (character, index) => {
@@ -74,13 +103,6 @@ const getLyricLineCharacters = ({ rawSection }) => {
   return lyrics && chordLines
     ? lyrics.map(eachLyricLineWithChords({ chordLines }))
     : []
-}
-
-const getInfo = ({ rawSection }) => {
-  if (/.*[A-Z]:/.test(rawSection)) {
-    const [, info] = rawSection.match(/.*[A-Z]:(.*)/)
-    return info
-  }
 }
 
 const getSectionType = ({ rawSection, lyrics, chords, song }) => {
@@ -143,54 +165,50 @@ const getSectionType = ({ rawSection, lyrics, chords, song }) => {
   }
 }
 
-module.exports = () => {
-  const songsheet = (rawSongsheet) => new Promise((resolve, reject) => {
-    const rawSections = rawSongsheet.replace('\r\n', '\n').replace(/^\s*\n/gm, '\n').split('\n\n')
-    resolve(rawSections.reduce((song, rawSection, structureIndex) => {
-      const presentLyrics = getLyrics({ rawSection })
-      const presentChords = getChords({ rawSection })
-      const presentLyricLineCharacters = getLyricLineCharacters({ rawSection })
-      const presentInfo = getInfo({ rawSection })
+const parse = (rawSongsheet) => new Promise((resolve, reject) => {
+  const rawSections = rawSongsheet.replace('\r\n', '\n').replace(/^\s*\n/gm, '\n').split('\n\n')
+  resolve(rawSections.reduce((song, rawSection, structureIndex) => {
+    const presentLyrics = getLyrics({ rawSection })
+    const presentChords = getChords({ rawSection, song })
+    const presentLyricLineCharacters = getLyricLineCharacters({ rawSection })
 
-      const sectionTypes = getSectionType({ rawSection, lyrics: presentLyrics, chords: presentChords, song }) || []
+    const sectionTypes = getSectionType({ rawSection, lyrics: presentLyrics, chords: presentChords, song }) || []
 
-      return sectionTypes.reduce((song, sectionType) => {
-        const section = song.get('sections').get(sectionType)
+    return sectionTypes.reduce((song, sectionType) => {
+      const section = song.get('sections').get(sectionType)
 
-        const lyrics = presentLyrics.length === 0 && section && section.get('lyrics')
-          ? section.get('lyrics')
-          : fromJS(presentLyrics)
+      const lyrics = presentLyrics.length === 0 && section && section.get('lyrics')
+        ? section.get('lyrics')
+        : fromJS(presentLyrics)
 
-        const chords = presentChords.length === 0 && section && section.get('chords')
-          ? section.get('chords')
-          : fromJS(presentChords)
+      const chords = presentChords.length === 0 && section && section.get('chords')
+        ? section.get('chords')
+        : fromJS(presentChords)
 
-        const lyricLineCharacters = presentLyrics.length === 0 && section && section.get('lyricLineCharacters')
-          ? section.get('lyricLineCharacters')
-          : fromJS(presentLyricLineCharacters)
+      const lyricLineCharacters = presentLyrics.length === 0 && section && section.get('lyricLineCharacters')
+        ? section.get('lyricLineCharacters')
+        : fromJS(presentLyricLineCharacters)
 
-        const info = !presentInfo && section && section.get('info')
-          ? section.get('info')
-          : presentInfo
+      return (!section
+        ? song.mergeDeepIn(['sections', sectionType], { lyrics, chords, lyricLineCharacters, count: 0 })
+        : song)
+        .updateIn(['sections', sectionType, 'count'], count => count + 1)
+        .updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, lyricLineCharacters, sectionIndex: song.getIn(['sections', sectionType, 'count']) || 0 })))
+    }, song)
+  }, Map({
+    title: rawSections[0].split(' - ')[0],
+    author: rawSections[0].split(' - ')[1],
+    structure: List(),
+    sections: Map({}),
+    rawSongsheet
+  })))
+})
 
-        return (!section
-          ? song.mergeDeepIn(['sections', sectionType], { lyrics, chords, info, lyricLineCharacters, count: 0 })
-          : song)
-          .updateIn(['sections', sectionType, 'count'], count => count + 1)
-          .updateIn(['structure'], structure => structure.push(Map({ sectionType, lyrics, chords, lyricLineCharacters, sectionIndex: song.getIn(['sections', sectionType, 'count']) || 0, info })))
-      }, song)
-    }, Map({
-      title: rawSections[0].split(' - ')[0],
-      author: rawSections[0].split(' - ')[1],
-      structure: List(),
-      sections: Map({}),
-      rawSongsheet
-    })))
-  })
-
-  songsheet.chordRegExp = chordRegExp
-  songsheet.wordRegExp = wordRegExp
-  songsheet.isChordLine = isChordLine
-
-  return songsheet
-}
+module.exports = () => ({ 
+  parse,
+  chordRegExp,
+  wordRegExp,
+  isChordLine,
+  multiplyRegExp,
+  multiplyExpand
+})
