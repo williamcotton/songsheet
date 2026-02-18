@@ -274,6 +274,8 @@ let synth = null
 let clickSynth = null
 let metronomeEnabled = false
 let scheduledEvents = []
+let scrollTargetY = 0
+let scrollAnimId = null
 
 // ─── DOM refs ────────────────────────────────────────────────────────
 
@@ -546,9 +548,11 @@ async function startPlayback() {
   isPlaying = true
   btnPlay.disabled = true
   btnStop.disabled = false
+  startAutoScroll()
 }
 
 function stopPlayback() {
+  stopAutoScroll()
   Tone.getTransport().stop()
   Tone.getTransport().cancel()
   if (synth) synth.releaseAll()
@@ -556,6 +560,27 @@ function stopPlayback() {
   isPlaying = false
   btnPlay.disabled = !currentSong
   btnStop.disabled = true
+}
+
+// ─── Auto-scroll ─────────────────────────────────────────────────────
+
+function startAutoScroll() {
+  scrollTargetY = window.scrollY
+  function tick() {
+    const diff = scrollTargetY - window.scrollY
+    if (Math.abs(diff) > 0.5) {
+      window.scrollTo(0, window.scrollY + diff * 0.08)
+    }
+    scrollAnimId = requestAnimationFrame(tick)
+  }
+  scrollAnimId = requestAnimationFrame(tick)
+}
+
+function stopAutoScroll() {
+  if (scrollAnimId !== null) {
+    cancelAnimationFrame(scrollAnimId)
+    scrollAnimId = null
+  }
 }
 
 // ─── Highlighting ────────────────────────────────────────────────────
@@ -583,7 +608,15 @@ function highlightPosition(structureIndex, lineIndex, markerIndex) {
   )
   if (marker) marker.classList.add('active-marker')
 
-  sectionEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  // Update auto-scroll target to place active line in upper third of viewport
+  if (scrollAnimId !== null) {
+    const scrollEl = (lineIndex >= 0)
+      ? sectionEl.querySelector(`.line-pair[data-line-index="${lineIndex}"]`) || sectionEl
+      : sectionEl
+    const controlsHeight = document.getElementById('controls').offsetHeight
+    scrollTargetY = scrollEl.offsetTop - controlsHeight - window.innerHeight * 0.3
+    scrollTargetY = Math.max(0, scrollTargetY)
+  }
 }
 
 // ─── Transpose ───────────────────────────────────────────────────────
