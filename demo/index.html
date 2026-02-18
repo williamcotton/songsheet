@@ -297,6 +297,11 @@ async function loadSong(filename) {
   semitoneOffset = 0
   transposeValue.textContent = '0'
   currentSong = originalSong
+  if (originalSong.bpm) {
+    bpmSlider.value = originalSong.bpm
+    bpmValue.textContent = originalSong.bpm
+    Tone.getTransport().bpm.value = originalSong.bpm
+  }
   renderSong(currentSong)
 }
 
@@ -376,6 +381,13 @@ function renderSong(song) {
 
         sectionDiv.appendChild(pairDiv)
       })
+      // Expression label for directives with inherited lines (e.g. INSTRUMENTAL: (VERSE))
+      if (entry.expression) {
+        const exprDiv = document.createElement('div')
+        exprDiv.className = 'expression-label'
+        exprDiv.textContent = '(' + expressionToString(entry.expression) + ')'
+        sectionDiv.appendChild(exprDiv)
+      }
     } else if (entry.chords.length > 0) {
       // Directive entries (instrumental, fill) — flat chord list with spans
       const chordDiv = document.createElement('div')

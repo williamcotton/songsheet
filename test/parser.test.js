@@ -122,7 +122,7 @@ describe('parse spent-some-time-in-buffalo', () => {
   })
 
   it('parses prechorus chords', () => {
-    expect(song.sections.prechorus.chords.map(c => c.root)).toEqual(['D'])
+    expect(song.sections.prechorus.chords.map(c => c.root)).toEqual(['D', 'D', 'D', 'D'])
   })
 
   it('parses chorus chords', () => {

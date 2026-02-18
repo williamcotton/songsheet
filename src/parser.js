@@ -101,6 +101,71 @@ export function resolveExpression(expr, sections) {
   }
 }
 
+/**
+ * Resolve an expression AST into a single compact line preserving
+ * chord and bar line structure from section references.
+ * Multi-line sections are flattened: "D | G | A C D |" on one row.
+ * Returns [] for chord_list expressions (no line structure to inherit).
+ */
+export function resolveExpressionLines(expr, sections) {
+  if (!expr) return []
+  const markers = collectExprMarkers(expr, sections)
+  if (markers.length === 0) return []
+  return [compactMarkersToLine(markers)]
+}
+
+function collectExprMarkers(expr, sections) {
+  switch (expr.type) {
+    case 'section_ref': {
+      const section = sections[expr.name]
+      if (!section) return []
+      const result = []
+      for (const line of section.lines) {
+        const lineMarkers = []
+        for (const chord of line.chords) {
+          lineMarkers.push({ col: chord.column, type: 'chord', root: chord.root, quality: chord.type })
+        }
+        for (const col of line.barLines) {
+          lineMarkers.push({ col, type: 'bar' })
+        }
+        lineMarkers.sort((a, b) => a.col - b.col)
+        result.push(...lineMarkers)
+      }
+      return result
+    }
+    case 'chord_list':
+      return []
+    case 'sequence':
+      return expr.items.flatMap(item => collectExprMarkers(item, sections))
+    case 'repeat': {
+      const body = collectExprMarkers(expr.body, sections)
+      const result = []
+      for (let i = 0; i < expr.count; i++) result.push(...body)
+      return result
+    }
+    default:
+      return []
+  }
+}
+
+function compactMarkersToLine(markers) {
+  const chords = []
+  const barLines = []
+  let col = 0
+  for (const m of markers) {
+    if (col > 0) col += 1
+    if (m.type === 'chord') {
+      const name = m.root + m.quality
+      chords.push({ root: m.root, type: m.quality, column: col })
+      col += name.length
+    } else {
+      barLines.push(col)
+      col += 1
+    }
+  }
+  return { chords, barLines, lyrics: '', characters: [] }
+}
+
 // ─── Chord-Lyric Parsing ─────────────────────────────────────────────
 
 /**
@@ -238,7 +303,7 @@ function classifyBlock(text, index, sections) {
     return { type: 'chord_only', text }
   }
   if (hasLyrics) {
-    return { type: 'lyric_only', text: trimmed }
+    return { type: 'lyric_only', text }
   }
 
   return { type: 'unknown', text: trimmed }
@@ -255,6 +320,7 @@ export function parse(rawSongsheet) {
   const structure = []
   let title = ''
   let author = ''
+  let bpm = null
 
   for (let blockIndex = 0; blockIndex < rawBlocks.length; blockIndex++) {
     const rawBlock = rawBlocks[blockIndex]
@@ -264,7 +330,13 @@ export function parse(rawSongsheet) {
 
     switch (block.type) {
       case 'title': {
-        const parts = block.text.split(' - ')
+        let text = block.text
+        const bpmMatch = text.match(/\((\d+)\s*bpm\)/i)
+        if (bpmMatch) {
+          bpm = parseInt(bpmMatch[1], 10)
+          text = text.replace(bpmMatch[0], '').trim()
+        }
+        const parts = text.split(' - ')
         title = parts[0] || ''
         author = parts[1] || ''
         break
@@ -305,7 +377,8 @@ export function parse(rawSongsheet) {
       case 'directive': {
         const expr = parseExpression(block.expression)
         const resolvedChords = resolveExpression(expr, sections)
-        const parsed = { lines: [], chords: resolvedChords, lyrics: [] }
+        const resolvedLines = resolveExpressionLines(expr, sections)
+        const parsed = { lines: resolvedLines, chords: resolvedChords, lyrics: [] }
         addSection(sections, block.label, parsed)
         const entry = buildStructureEntry(sections, block.label, parsed)
         entry.expression = expr
@@ -337,7 +410,7 @@ export function parse(rawSongsheet) {
     }
   }
 
-  return { title, author, sections, structure }
+  return { title, author, bpm, sections, structure }
 }
 
 function inferSectionType(sections, lyrics, chords) {
