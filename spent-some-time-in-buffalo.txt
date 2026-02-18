@@ -1,10 +1,10 @@
 SPENT SOME TIME IN BUFFALO - WILLIE COTTON
 
-D
+D                        |
  Sweating bullets in the morning
-G 
+G                                 |
  The same old rhyme, the same old reason
-        A                               C                                   D 
+        A                               C                                   D     |
  Had to get our fill of drinking up the last warm night of this here summer season
 
  Riding shotgun down to Dansville
@@ -12,16 +12,19 @@ G
  Pretty soon this truck'll be kicking up rock salt in everybody's front lawn
  
 PRECHORUS:
-D
+D                         |
  Spent some time in Buffalo
+D                          |
  Dug my life out of the snow
+D                                      |
  And when those lake winds start to blow
+D                               |
  I've had my fill it's time to go
 
 CHORUS:
-C                            G                                D
+C                            G                                D    |
  Head out west to find the good life but I'm thinking of you now
-C                                    G                                     D 
+C                                  G                                     D    |
  Can't pay the rent, packing up my tent, picking up my money, I'm headed home
 
  Just like Jimmie nobody wants me
