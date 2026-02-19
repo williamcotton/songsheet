@@ -21,7 +21,12 @@ export function semitoneToNote(semitone, preferFlats) {
 export function transposeChord(chord, semitones, preferFlats) {
   const semitone = noteToSemitone(chord.root)
   const newRoot = semitoneToNote(semitone + semitones, preferFlats)
-  return { root: newRoot, type: chord.type }
+  const result = { root: newRoot, type: chord.type }
+  if (chord.bass) {
+    const bassSemitone = noteToSemitone(chord.bass)
+    result.bass = semitoneToNote(bassSemitone + semitones, preferFlats)
+  }
+  return result
 }
 
 /**

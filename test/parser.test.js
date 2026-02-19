@@ -112,6 +112,14 @@ describe('parse spent-some-time-in-buffalo', () => {
     expect(song.author).toBe('WILLIE COTTON')
   })
 
+  it('extracts BPM', () => {
+    expect(song.bpm).toBe(100)
+  })
+
+  it('has null timeSignature when not specified', () => {
+    expect(song.timeSignature).toBeNull()
+  })
+
   it('counts sections correctly', () => {
     expect(song.sections.verse.count).toBe(3)
     expect(song.sections.chorus.count).toBe(3)
@@ -180,6 +188,14 @@ describe('parse song-of-myself', () => {
     expect(song.author).toBe('WILLIE AND WALT')
   })
 
+  it('extracts time signature', () => {
+    expect(song.timeSignature).toEqual({ beats: 3, value: 4 })
+  })
+
+  it('has null BPM when not specified', () => {
+    expect(song.bpm).toBeNull()
+  })
+
   it('counts sections correctly', () => {
     expect(song.sections.verse.count).toBe(1)
     expect(song.sections.chorus.count).toBe(1)
@@ -235,6 +251,54 @@ describe('parse song-of-myself', () => {
   it('stores chorus and bridge chords', () => {
     expect(song.sections.chorus.chords.map(c => c.root)).toEqual(['G', 'C', 'G', 'D', 'C', 'G', 'G', 'C', 'G', 'D', 'C', 'G'])
     expect(song.sections.bridge.chords.map(c => c.root)).toEqual(['C', 'G'])
+  })
+})
+
+describe('time signature parsing', () => {
+  it('returns null timeSignature when only BPM is present', () => {
+    const song = parse('SONG - AUTHOR\n(120 BPM)\n\nG\nLyrics')
+    expect(song.bpm).toBe(120)
+    expect(song.timeSignature).toBeNull()
+  })
+
+  it('parses time signature without BPM', () => {
+    const song = parse('SONG - AUTHOR\n(3/4 time)\n\nG\nLyrics')
+    expect(song.bpm).toBeNull()
+    expect(song.timeSignature).toEqual({ beats: 3, value: 4 })
+  })
+
+  it('parses both BPM and time signature together', () => {
+    const song = parse('SONG - AUTHOR\n(100 BPM, 3/4 time)\n\nG\nLyrics')
+    expect(song.bpm).toBe(100)
+    expect(song.timeSignature).toEqual({ beats: 3, value: 4 })
+  })
+
+  it('parses reversed order: time signature before BPM', () => {
+    const song = parse('SONG - AUTHOR\n(3/4 time, 100 BPM)\n\nG\nLyrics')
+    expect(song.bpm).toBe(100)
+    expect(song.timeSignature).toEqual({ beats: 3, value: 4 })
+  })
+
+  it('parses 6/8 time', () => {
+    const song = parse('SONG - AUTHOR\n(6/8 Time)\n\nG\nLyrics')
+    expect(song.timeSignature).toEqual({ beats: 6, value: 8 })
+  })
+
+  it('is case insensitive for TIME', () => {
+    const song = parse('SONG - AUTHOR\n(3/4 TIME)\n\nG\nLyrics')
+    expect(song.timeSignature).toEqual({ beats: 3, value: 4 })
+  })
+
+  it('returns both null when no metadata parens present', () => {
+    const song = parse('SONG - AUTHOR\n\nG\nLyrics')
+    expect(song.bpm).toBeNull()
+    expect(song.timeSignature).toBeNull()
+  })
+
+  it('does not match non-metadata parens like (live)', () => {
+    const song = parse('SONG - AUTHOR\n(live)\n\nG\nLyrics')
+    expect(song.bpm).toBeNull()
+    expect(song.timeSignature).toBeNull()
   })
 })
 

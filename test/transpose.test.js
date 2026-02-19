@@ -56,6 +56,19 @@ describe('transposeChord', () => {
     expect(transposeChord({ root: 'B', type: '' }, 1, false)).toEqual({ root: 'C', type: '' })
     expect(transposeChord({ root: 'C', type: '' }, -1, false)).toEqual({ root: 'B', type: '' })
   })
+
+  it('transposes slash chord bass note', () => {
+    expect(transposeChord({ root: 'G', type: '', bass: 'B' }, 2, false)).toEqual({ root: 'A', type: '', bass: 'C#' })
+  })
+
+  it('transposes slash chord bass note with flats', () => {
+    expect(transposeChord({ root: 'C', type: 'maj7', bass: 'Bb' }, 2, true)).toEqual({ root: 'D', type: 'maj7', bass: 'C' })
+  })
+
+  it('does not add bass when not present', () => {
+    const result = transposeChord({ root: 'G', type: '' }, 2, false)
+    expect(result.bass).toBeUndefined()
+  })
 })
 
 describe('transpose full song', () => {

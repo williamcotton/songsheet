@@ -1,6 +1,6 @@
 const ROOTS = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'G'])
 const ACCIDENTALS = new Set(['#', 'b'])
-const QUALITY_CHARS = /[a-z0-9#+\/]/i
+const QUALITY_CHARS = /[a-z0-9#+]/i
 
 /**
  * Scan a line left-to-right and return an array of chord/bar-line tokens,
@@ -49,12 +49,30 @@ export function scanChordLine(line) {
         i++
       }
 
+      // slash chord: /Bass
+      let bass = ''
+      if (i < line.length && line[i] === '/') {
+        i++ // consume /
+        if (i < line.length && ROOTS.has(line[i])) {
+          bass = line[i]
+          i++
+          if (i < line.length && ACCIDENTALS.has(line[i])) {
+            bass += line[i]
+            i++
+          }
+        } else {
+          return null // / not followed by a valid note
+        }
+      }
+
       // next char must be whitespace, end-of-line, or |
       if (i < line.length && line[i] !== ' ' && line[i] !== '\t' && line[i] !== '|') {
         return null // not a chord line
       }
 
-      tokens.push({ type: 'CHORD', column, root, quality })
+      const token = { type: 'CHORD', column, root, quality }
+      if (bass) token.bass = bass
+      tokens.push(token)
       continue
     }
 
@@ -113,7 +131,7 @@ export function lexExpression(text) {
     // word or chord: starts with a letter
     if (/[A-Za-z]/.test(text[i])) {
       let word = ''
-      while (i < text.length && /[A-Za-z0-9#b+\/]/.test(text[i])) { word += text[i]; i++ }
+      while (i < text.length && /[A-Za-z0-9#b+]/.test(text[i])) { word += text[i]; i++ }
 
       // Determine if this is a chord (starts with A-G, followed by optional accidental + quality)
       // or a section reference word (all caps like VERSE, CHORUS)
@@ -125,7 +143,22 @@ export function lexExpression(text) {
           root += rest[0]
           rest = rest.slice(1)
         }
-        tokens.push({ type: ExprTokenTypes.CHORD, root, quality: rest })
+        // Check for slash bass note
+        let bass = ''
+        if (i < text.length && text[i] === '/') {
+          i++ // consume /
+          if (i < text.length && ROOTS.has(text[i])) {
+            bass = text[i]
+            i++
+            if (i < text.length && ACCIDENTALS.has(text[i])) {
+              bass += text[i]
+              i++
+            }
+          }
+        }
+        const token = { type: ExprTokenTypes.CHORD, root, quality: rest }
+        if (bass) token.bass = bass
+        tokens.push(token)
       } else {
         tokens.push({ type: ExprTokenTypes.WORD, value: word })
       }

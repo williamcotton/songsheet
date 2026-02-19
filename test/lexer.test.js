@@ -80,6 +80,56 @@ describe('scanChordLine', () => {
   })
 })
 
+describe('scanChordLine slash chords', () => {
+  it('parses simple slash chord G/B', () => {
+    const tokens = scanChordLine('G/B')
+    expect(tokens).not.toBeNull()
+    expect(tokens.length).toBe(1)
+    expect(tokens[0]).toEqual({ type: 'CHORD', column: 0, root: 'G', quality: '', bass: 'B' })
+  })
+
+  it('parses slash chord with quality Am7/E', () => {
+    const tokens = scanChordLine('Am7/E')
+    expect(tokens).not.toBeNull()
+    expect(tokens[0]).toMatchObject({ root: 'A', quality: 'm7', bass: 'E' })
+  })
+
+  it('parses slash chord with accidental bass Cmaj7/Bb', () => {
+    const tokens = scanChordLine('Cmaj7/Bb')
+    expect(tokens).not.toBeNull()
+    expect(tokens[0]).toMatchObject({ root: 'C', quality: 'maj7', bass: 'Bb' })
+  })
+
+  it('parses slash chord with accidental root and bass F#m/C#', () => {
+    const tokens = scanChordLine('F#m/C#')
+    expect(tokens).not.toBeNull()
+    expect(tokens[0]).toMatchObject({ root: 'F#', quality: 'm', bass: 'C#' })
+  })
+
+  it('parses multiple slash chords on a line', () => {
+    const tokens = scanChordLine('G/B   C/E   D/F#')
+    expect(tokens).not.toBeNull()
+    const chords = tokens.filter(t => t.type === 'CHORD')
+    expect(chords.length).toBe(3)
+    expect(chords[0]).toMatchObject({ root: 'G', bass: 'B' })
+    expect(chords[1]).toMatchObject({ root: 'C', bass: 'E' })
+    expect(chords[2]).toMatchObject({ root: 'D', bass: 'F#' })
+  })
+
+  it('mixes slash and non-slash chords', () => {
+    const tokens = scanChordLine('G/B Am C')
+    expect(tokens).not.toBeNull()
+    const chords = tokens.filter(t => t.type === 'CHORD')
+    expect(chords[0].bass).toBe('B')
+    expect(chords[1].bass).toBeUndefined()
+    expect(chords[2].bass).toBeUndefined()
+  })
+
+  it('rejects / not followed by a valid root', () => {
+    expect(scanChordLine('G/z')).toBeNull()
+  })
+})
+
 describe('lexExpression', () => {
   it('tokenizes simple chord list', () => {
     const tokens = lexExpression('D G D A')
@@ -105,5 +155,21 @@ describe('lexExpression', () => {
     const tokens = lexExpression('D G D A D')
     const chords = tokens.filter(t => t.type === ExprTokenTypes.CHORD)
     expect(chords.length).toBe(5)
+  })
+
+  it('tokenizes slash chords in expressions', () => {
+    const tokens = lexExpression('G/B C/E Am')
+    const chords = tokens.filter(t => t.type === ExprTokenTypes.CHORD)
+    expect(chords.length).toBe(3)
+    expect(chords[0]).toMatchObject({ root: 'G', quality: '', bass: 'B' })
+    expect(chords[1]).toMatchObject({ root: 'C', quality: '', bass: 'E' })
+    expect(chords[2]).toMatchObject({ root: 'A', quality: 'm' })
+    expect(chords[2].bass).toBeUndefined()
+  })
+
+  it('tokenizes slash chord with accidental bass in expression', () => {
+    const tokens = lexExpression('Cmaj7/Bb')
+    const chords = tokens.filter(t => t.type === ExprTokenTypes.CHORD)
+    expect(chords[0]).toMatchObject({ root: 'C', quality: 'maj7', bass: 'Bb' })
   })
 })

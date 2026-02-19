@@ -62,7 +62,9 @@ export function parseExpression(text) {
       const chords = []
       while (peek().type === ExprTokenTypes.CHORD) {
         const c = advance()
-        chords.push({ root: c.root, type: c.quality })
+        const chord = { root: c.root, type: c.quality }
+        if (c.bass) chord.bass = c.bass
+        chords.push(chord)
       }
       return { type: 'chord_list', chords }
     }
@@ -123,7 +125,9 @@ function collectExprMarkers(expr, sections) {
       for (const line of section.lines) {
         const lineMarkers = []
         for (const chord of line.chords) {
-          lineMarkers.push({ col: chord.column, type: 'chord', root: chord.root, quality: chord.type })
+          const marker = { col: chord.column, type: 'chord', root: chord.root, quality: chord.type }
+          if (chord.bass) marker.bass = chord.bass
+          lineMarkers.push(marker)
         }
         for (const col of line.barLines) {
           lineMarkers.push({ col, type: 'bar' })
@@ -155,8 +159,10 @@ function compactMarkersToLine(markers) {
   for (const m of markers) {
     if (col > 0) col += 1
     if (m.type === 'chord') {
-      const name = m.root + m.quality
-      chords.push({ root: m.root, type: m.quality, column: col })
+      const name = m.root + m.quality + (m.bass ? '/' + m.bass : '')
+      const chord = { root: m.root, type: m.quality, column: col }
+      if (m.bass) chord.bass = m.bass
+      chords.push(chord)
       col += name.length
     } else {
       barLines.push(col)
@@ -180,7 +186,9 @@ function buildCharacterAlignment(chordTokens, lyricLine) {
   if (chordTokens) {
     for (const token of chordTokens) {
       if (token.type === 'CHORD') {
-        chordMap.set(token.column, { root: token.root, type: token.quality })
+        const chord = { root: token.root, type: token.quality }
+        if (token.bass) chord.bass = token.bass
+        chordMap.set(token.column, chord)
       } else if (token.type === 'BAR_LINE') {
         barLineSet.add(token.column)
       }
@@ -219,7 +227,11 @@ function parseChordLyricBlock(text) {
     if (tokens) {
       // This is a chord line — next non-chord line is its paired lyric
       const chordTokens = tokens
-      const chords = tokens.filter(t => t.type === 'CHORD').map(t => ({ root: t.root, type: t.quality, column: t.column }))
+      const chords = tokens.filter(t => t.type === 'CHORD').map(t => {
+        const c = { root: t.root, type: t.quality, column: t.column }
+        if (t.bass) c.bass = t.bass
+        return c
+      })
       const barLines = tokens.filter(t => t.type === 'BAR_LINE').map(t => t.column)
 
       i++
@@ -230,7 +242,11 @@ function parseChordLyricBlock(text) {
         i++
       }
 
-      allChords.push(...chords.map(c => ({ root: c.root, type: c.type })))
+      allChords.push(...chords.map(c => {
+        const ch = { root: c.root, type: c.type }
+        if (c.bass) ch.bass = c.bass
+        return ch
+      }))
       if (lyricLine) allLyrics.push(lyricLine)
 
       lines.push({
@@ -321,6 +337,7 @@ export function parse(rawSongsheet) {
   let title = ''
   let author = ''
   let bpm = null
+  let timeSignature = null
 
   for (let blockIndex = 0; blockIndex < rawBlocks.length; blockIndex++) {
     const rawBlock = rawBlocks[blockIndex]
@@ -331,10 +348,18 @@ export function parse(rawSongsheet) {
     switch (block.type) {
       case 'title': {
         let text = block.text
-        const bpmMatch = text.match(/\((\d+)\s*bpm\)/i)
-        if (bpmMatch) {
-          bpm = parseInt(bpmMatch[1], 10)
-          text = text.replace(bpmMatch[0], '').trim()
+        const metaMatch = text.match(/\(([^)]*(?:\d+\s*bpm|\d+\/\d+\s*time)[^)]*)\)/i)
+        if (metaMatch) {
+          const metaStr = metaMatch[1]
+          const bpmInner = metaStr.match(/(\d+)\s*bpm/i)
+          if (bpmInner) {
+            bpm = parseInt(bpmInner[1], 10)
+          }
+          const timeMatch = metaStr.match(/(\d+)\/(\d+)\s*time/i)
+          if (timeMatch) {
+            timeSignature = { beats: parseInt(timeMatch[1], 10), value: parseInt(timeMatch[2], 10) }
+          }
+          text = text.replace(metaMatch[0], '').trim()
         }
         const parts = text.split(' - ')
         title = parts[0] || ''
@@ -410,7 +435,7 @@ export function parse(rawSongsheet) {
     }
   }
 
-  return { title, author, bpm, sections, structure }
+  return { title, author, bpm, timeSignature, sections, structure }
 }
 
 function inferSectionType(sections, lyrics, chords) {
