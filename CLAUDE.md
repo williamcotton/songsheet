@@ -38,23 +38,7 @@ ESM only (`"type": "module"` in package.json). No CommonJS.
 npm test              # vitest run — all tests
 npx vitest            # watch mode
 npx vitest run test/parser.test.js   # single file
-npm run demo          # serve demo at http://localhost:3000
 ```
-
-## Demo
-
-A browser-based interactive demo lives in `demo/index.html`. It uses an import map to load the library directly from `../index.js` (no build step) and pulls in [Tone.js](https://tonejs.github.io/) from esm.sh for audio playback.
-
-**Features:**
-- Song selector — loads and parses all 4 fixture `.txt` files
-- Live transpose — applies `transpose()` in real time, re-renders the AST
-- Chord playback — schedules chords via Tone.js `PolySynth` (triangle wave), one measure per chord
-- Bar line handling — `|` markers repeat the preceding chord for extra measures
-- Active highlighting — current section, line, and chord marker light up during playback
-- BPM slider — adjusts Tone.js transport tempo (40–160 BPM)
-- Optional metronome — white noise click on quarter notes
-
-**Running:** `npm run demo` starts a local server (`npx serve . -l 3000`), then open `http://localhost:3000/demo/`.
 
 ## AST Shape
 

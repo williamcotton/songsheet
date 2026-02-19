@@ -5,8 +5,7 @@
   "type": "module",
   "exports": "./index.js",
   "scripts": {
-    "test": "vitest run",
-    "demo": "npx serve . -l 3000 --no-clipboard"
+    "test": "vitest run"
   },
   "repository": {
     "type": "git",
