@@ -23,10 +23,11 @@ const songInBb = transpose(song, 3, { preferFlats: true })
 
 ```
 SONG TITLE - AUTHOR NAME
+(120 BPM, 3/4 time)
 
 G                               F
  Lyrics aligned under chords...
-               C                G
+               C/E              G/B
  More lyrics here
 
 F                C             D
@@ -45,6 +46,25 @@ INSTRUMENTAL: (VERSE, CHORUS*2)
 FILL: D G D A D
 
 BRIDGE
+```
+
+### Metadata
+
+BPM and time signature can be specified in parentheses after the title line:
+
+```
+SONG TITLE - AUTHOR NAME
+(120 BPM)
+(3/4 time)
+(120 BPM, 3/4 time)
+```
+
+### Slash Chords
+
+Slash chords like `G/B`, `Am7/E`, `F#m/C#` are supported in both chord lines and expressions. The bass note is stored separately:
+
+```js
+{ root: 'G', type: '', bass: 'B' }
 ```
 
 ### Section Type Inference
@@ -76,12 +96,17 @@ Examples: `(VERSE, CHORUS*2)`, `(D G D A)*4`, `D G D A D`
 {
   title: 'SONG TITLE',
   author: 'AUTHOR NAME',
+  bpm: 120,                // number | null
+  timeSignature: {         // { beats, value } | null
+    beats: 3,
+    value: 4,
+  },
 
   // Unique section definitions
   sections: {
     verse: {
       count: 4,
-      chords: [{ root: 'G', type: '' }, { root: 'F', type: '' }, ...],
+      chords: [{ root: 'G', type: '' }, { root: 'F', type: '', bass: 'B' }, ...],
       lyrics: ['lyric line 1', ...],
       lines: [
         {
@@ -116,7 +141,7 @@ Examples: `(VERSE, CHORUS*2)`, `(D G D A)*4`, `D G D A D`
 
 ## Transposition
 
-`transpose()` deep-walks the AST and replaces every chord root. It auto-detects whether the song uses flats or sharps, or you can override with `{ preferFlats: true }`.
+`transpose()` deep-walks the AST and replaces every chord root (and bass note on slash chords). It auto-detects whether the song uses flats or sharps, or you can override with `{ preferFlats: true }`.
 
 ```js
 const song = parse(rawText)
