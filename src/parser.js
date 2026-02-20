@@ -1,5 +1,31 @@
 import { scanChordLine, isChordLine, lexExpression, ExprTokenTypes } from './lexer.js'
 
+// ─── Token-to-Chord Helpers ──────────────────────────────────────────
+
+/**
+ * Convert a lexer CHORD token into a chord object for the AST.
+ * Propagates optional fields: bass, nashville, diamond, push, stop, splitMeasure.
+ */
+function tokenToChord(token) {
+  const chord = { root: token.root, type: token.quality }
+  if (token.bass) chord.bass = token.bass
+  if (token.nashville) chord.nashville = true
+  if (token.diamond) chord.diamond = true
+  if (token.push) chord.push = true
+  if (token.stop) chord.stop = true
+  if (token.splitMeasure) chord.splitMeasure = token.splitMeasure
+  return chord
+}
+
+/**
+ * Like tokenToChord but also preserves column position.
+ */
+function tokenToPositionedChord(token) {
+  const chord = tokenToChord(token)
+  chord.column = token.column
+  return chord
+}
+
 // ─── Expression Parser (recursive descent) ───────────────────────────
 
 /**
@@ -62,9 +88,7 @@ export function parseExpression(text) {
       const chords = []
       while (peek().type === ExprTokenTypes.CHORD) {
         const c = advance()
-        const chord = { root: c.root, type: c.quality }
-        if (c.bass) chord.bass = c.bass
-        chords.push(chord)
+        chords.push(tokenToChord(c))
       }
       return { type: 'chord_list', chords }
     }
@@ -127,6 +151,11 @@ function collectExprMarkers(expr, sections) {
         for (const chord of line.chords) {
           const marker = { col: chord.column, type: 'chord', root: chord.root, quality: chord.type }
           if (chord.bass) marker.bass = chord.bass
+          if (chord.nashville) marker.nashville = true
+          if (chord.diamond) marker.diamond = true
+          if (chord.push) marker.push = true
+          if (chord.stop) marker.stop = true
+          if (chord.splitMeasure) marker.splitMeasure = chord.splitMeasure
           lineMarkers.push(marker)
         }
         for (const col of line.barLines) {
@@ -162,6 +191,11 @@ function compactMarkersToLine(markers) {
       const name = m.root + m.quality + (m.bass ? '/' + m.bass : '')
       const chord = { root: m.root, type: m.quality, column: col }
       if (m.bass) chord.bass = m.bass
+      if (m.nashville) chord.nashville = true
+      if (m.diamond) chord.diamond = true
+      if (m.push) chord.push = true
+      if (m.stop) chord.stop = true
+      if (m.splitMeasure) chord.splitMeasure = m.splitMeasure
       chords.push(chord)
       col += name.length
     } else {
@@ -186,9 +220,7 @@ function buildCharacterAlignment(chordTokens, lyricLine) {
   if (chordTokens) {
     for (const token of chordTokens) {
       if (token.type === 'CHORD') {
-        const chord = { root: token.root, type: token.quality }
-        if (token.bass) chord.bass = token.bass
-        chordMap.set(token.column, chord)
+        chordMap.set(token.column, tokenToChord(token))
       } else if (token.type === 'BAR_LINE') {
         barLineSet.add(token.column)
       }
@@ -227,11 +259,7 @@ function parseChordLyricBlock(text) {
     if (tokens) {
       // This is a chord line — next non-chord line is its paired lyric
       const chordTokens = tokens
-      const chords = tokens.filter(t => t.type === 'CHORD').map(t => {
-        const c = { root: t.root, type: t.quality, column: t.column }
-        if (t.bass) c.bass = t.bass
-        return c
-      })
+      const chords = tokens.filter(t => t.type === 'CHORD').map(t => tokenToPositionedChord(t))
       const barLines = tokens.filter(t => t.type === 'BAR_LINE').map(t => t.column)
 
       i++
@@ -245,6 +273,11 @@ function parseChordLyricBlock(text) {
       allChords.push(...chords.map(c => {
         const ch = { root: c.root, type: c.type }
         if (c.bass) ch.bass = c.bass
+        if (c.nashville) ch.nashville = true
+        if (c.diamond) ch.diamond = true
+        if (c.push) ch.push = true
+        if (c.stop) ch.stop = true
+        if (c.splitMeasure) ch.splitMeasure = c.splitMeasure
         return ch
       }))
       if (lyricLine) allLyrics.push(lyricLine)
@@ -338,6 +371,7 @@ export function parse(rawSongsheet) {
   let author = ''
   let bpm = null
   let timeSignature = null
+  let key = null
 
   for (let blockIndex = 0; blockIndex < rawBlocks.length; blockIndex++) {
     const rawBlock = rawBlocks[blockIndex]
@@ -348,7 +382,7 @@ export function parse(rawSongsheet) {
     switch (block.type) {
       case 'title': {
         let text = block.text
-        const metaMatch = text.match(/\(([^)]*(?:\d+\s*bpm|\d+\/\d+\s*time)[^)]*)\)/i)
+        const metaMatch = text.match(/\(([^)]*(?:\d+\s*bpm|\d+\/\d+\s*time|[A-G][b#]?\s*key)[^)]*)\)/i)
         if (metaMatch) {
           const metaStr = metaMatch[1]
           const bpmInner = metaStr.match(/(\d+)\s*bpm/i)
@@ -358,6 +392,10 @@ export function parse(rawSongsheet) {
           const timeMatch = metaStr.match(/(\d+)\/(\d+)\s*time/i)
           if (timeMatch) {
             timeSignature = { beats: parseInt(timeMatch[1], 10), value: parseInt(timeMatch[2], 10) }
+          }
+          const keyMatch = metaStr.match(/([A-G][b#]?)\s*key/i)
+          if (keyMatch) {
+            key = keyMatch[1]
           }
           text = text.replace(metaMatch[0], '').trim()
         }
@@ -435,7 +473,7 @@ export function parse(rawSongsheet) {
     }
   }
 
-  return { title, author, bpm, timeSignature, sections, structure }
+  return { title, author, bpm, timeSignature, key, sections, structure }
 }
 
 function inferSectionType(sections, lyrics, chords) {

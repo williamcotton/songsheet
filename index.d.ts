@@ -2,6 +2,11 @@ export interface Chord {
   root: string
   type: string
   bass?: string
+  nashville?: boolean
+  diamond?: boolean
+  push?: boolean
+  stop?: boolean
+  splitMeasure?: Chord[]
 }
 
 export interface PositionedChord extends Chord {
@@ -53,9 +58,12 @@ export interface Song {
   author: string
   bpm: number | null
   timeSignature: TimeSignature | null
+  key: string | null
   sections: Record<string, Section>
   structure: StructureEntry[]
 }
 
 export function parse(raw: string): Song
 export function transpose(song: Song, semitones: number, options?: { preferFlats?: boolean }): Song
+export function toNashville(song: Song, key: string): Song
+export function toStandard(song: Song, key: string): Song

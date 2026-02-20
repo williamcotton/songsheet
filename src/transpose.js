@@ -21,10 +21,13 @@ export function semitoneToNote(semitone, preferFlats) {
 export function transposeChord(chord, semitones, preferFlats) {
   const semitone = noteToSemitone(chord.root)
   const newRoot = semitoneToNote(semitone + semitones, preferFlats)
-  const result = { root: newRoot, type: chord.type }
+  const result = { ...chord, root: newRoot }
   if (chord.bass) {
     const bassSemitone = noteToSemitone(chord.bass)
     result.bass = semitoneToNote(bassSemitone + semitones, preferFlats)
+  }
+  if (chord.splitMeasure) {
+    result.splitMeasure = chord.splitMeasure.map(c => transposeChordObj(c, semitones, preferFlats))
   }
   return result
 }
@@ -43,6 +46,7 @@ function detectPreferFlats(song) {
 
 function transposeChordObj(chord, semitones, preferFlats) {
   if (!chord || !chord.root) return chord
+  if (chord.nashville) return chord
   return transposeChord(chord, semitones, preferFlats)
 }
 

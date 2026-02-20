@@ -1,13 +1,67 @@
 const ROOTS = new Set(['A', 'B', 'C', 'D', 'E', 'F', 'G'])
+const NNS_ROOTS = new Set(['1', '2', '3', '4', '5', '6', '7'])
 const ACCIDENTALS = new Set(['#', 'b'])
 const QUALITY_CHARS = /[a-z0-9#+]/i
+
+/**
+ * Try to parse a chord starting at position i in line.
+ * Accepts both letter roots (A-G) and NNS roots (1-7).
+ * Returns { token, end } or null.
+ */
+function parseChordAt(line, i, stopChars) {
+  const ch = line[i]
+  const isNNS = NNS_ROOTS.has(ch)
+  const isLetter = ROOTS.has(ch)
+  if (!isNNS && !isLetter) return null
+
+  let root = ch
+  let j = i + 1
+
+  // accidental (only for letter roots)
+  if (!isNNS && j < line.length && ACCIDENTALS.has(line[j])) {
+    root += line[j]
+    j++
+  }
+
+  // quality: consume word chars that are valid in chord names
+  let quality = ''
+  while (j < line.length && QUALITY_CHARS.test(line[j]) && line[j] !== ' ' && line[j] !== '|') {
+    if (stopChars && stopChars.has(line[j])) break
+    quality += line[j]
+    j++
+  }
+
+  // slash chord: /Bass
+  let bass = ''
+  if (j < line.length && line[j] === '/') {
+    j++ // consume /
+    if (j < line.length && (ROOTS.has(line[j]) || NNS_ROOTS.has(line[j]))) {
+      const bassIsNNS = NNS_ROOTS.has(line[j])
+      bass = line[j]
+      j++
+      if (!bassIsNNS && j < line.length && ACCIDENTALS.has(line[j])) {
+        bass += line[j]
+        j++
+      }
+    } else {
+      return null // / not followed by a valid note
+    }
+  }
+
+  const token = { type: 'CHORD', column: i, root, quality }
+  if (bass) token.bass = bass
+  if (isNNS) token.nashville = true
+  return { token, end: j }
+}
+
+const DECORATOR_STOP_CHARS = new Set(['>', ']', '!'])
 
 /**
  * Scan a line left-to-right and return an array of chord/bar-line tokens,
  * or null if the line is not a valid chord line.
  *
  * A chord line must contain at least one chord, and every non-whitespace
- * token must parse as a valid chord or `|`.
+ * token must parse as a valid chord, decorator, or `|`.
  */
 export function scanChordLine(line) {
   if (!line || line.trim().length === 0) return null
@@ -31,38 +85,92 @@ export function scanChordLine(line) {
       continue
     }
 
-    // try to parse a chord: root + optional accidental + optional quality
-    if (ROOTS.has(line[i])) {
-      let root = line[i]
-      i++
-
-      // accidental
-      if (i < line.length && ACCIDENTALS.has(line[i])) {
-        root += line[i]
+    // diamond: <chord>
+    if (line[i] === '<') {
+      i++ // consume <
+      const result = parseChordAt(line, i, DECORATOR_STOP_CHARS)
+      if (!result) return null
+      if (result.end >= line.length || line[result.end] !== '>') return null
+      i = result.end + 1 // consume >
+      const token = { ...result.token, column, diamond: true }
+      // next char must be whitespace, end-of-line, |, or !
+      if (i < line.length && line[i] === '!') {
+        token.stop = true
         i++
       }
+      if (i < line.length && line[i] !== ' ' && line[i] !== '\t' && line[i] !== '|') {
+        return null
+      }
+      tokens.push(token)
+      continue
+    }
 
-      // quality: consume word chars that are valid in chord names
-      let quality = ''
-      while (i < line.length && QUALITY_CHARS.test(line[i]) && line[i] !== ' ' && line[i] !== '|') {
-        quality += line[i]
+    // push: ^chord
+    if (line[i] === '^') {
+      i++ // consume ^
+      const result = parseChordAt(line, i, DECORATOR_STOP_CHARS)
+      if (!result) return null
+      i = result.end
+      const token = { ...result.token, column, push: true }
+      if (i < line.length && line[i] === '!') {
+        token.stop = true
         i++
       }
+      if (i < line.length && line[i] !== ' ' && line[i] !== '\t' && line[i] !== '|') {
+        return null
+      }
+      tokens.push(token)
+      continue
+    }
 
-      // slash chord: /Bass
-      let bass = ''
-      if (i < line.length && line[i] === '/') {
-        i++ // consume /
-        if (i < line.length && ROOTS.has(line[i])) {
-          bass = line[i]
-          i++
-          if (i < line.length && ACCIDENTALS.has(line[i])) {
-            bass += line[i]
-            i++
-          }
-        } else {
-          return null // / not followed by a valid note
-        }
+    // split measure: [chord chord ...]
+    if (line[i] === '[') {
+      i++ // consume [
+      const chords = []
+      while (i < line.length && line[i] !== ']') {
+        if (line[i] === ' ' || line[i] === '\t') { i++; continue }
+        const result = parseChordAt(line, i, DECORATOR_STOP_CHARS)
+        if (!result) return null
+        chords.push(result.token)
+        i = result.end
+      }
+      if (i >= line.length || line[i] !== ']') return null
+      i++ // consume ]
+      if (chords.length < 2) return null
+      // next char must be whitespace, end-of-line, or |
+      if (i < line.length && line[i] !== ' ' && line[i] !== '\t' && line[i] !== '|') {
+        return null
+      }
+      // Use the first chord as the main token, attach all chords as splitMeasure
+      const first = chords[0]
+      const token = {
+        type: 'CHORD',
+        column,
+        root: first.root,
+        quality: first.quality,
+        splitMeasure: chords.map(c => {
+          const sc = { root: c.root, type: c.quality }
+          if (c.bass) sc.bass = c.bass
+          if (c.nashville) sc.nashville = true
+          return sc
+        }),
+      }
+      if (first.bass) token.bass = first.bass
+      if (first.nashville) token.nashville = true
+      tokens.push(token)
+      continue
+    }
+
+    // try to parse a chord: letter root or NNS root
+    if (ROOTS.has(line[i]) || NNS_ROOTS.has(line[i])) {
+      const result = parseChordAt(line, i, DECORATOR_STOP_CHARS)
+      if (!result) return null
+      i = result.end
+
+      // check for stop suffix
+      if (i < line.length && line[i] === '!') {
+        result.token.stop = true
+        i++
       }
 
       // next char must be whitespace, end-of-line, or |
@@ -70,9 +178,7 @@ export function scanChordLine(line) {
         return null // not a chord line
       }
 
-      const token = { type: 'CHORD', column, root, quality }
-      if (bass) token.bass = bass
-      tokens.push(token)
+      tokens.push(result.token)
       continue
     }
 
@@ -112,19 +218,51 @@ const ExprTokenTypes = {
 export function lexExpression(text) {
   const tokens = []
   let i = 0
+  let lastType = null
 
   while (i < text.length) {
     if (text[i] === ' ' || text[i] === '\t') { i++; continue }
-    if (text[i] === '(') { tokens.push({ type: ExprTokenTypes.LPAREN }); i++; continue }
-    if (text[i] === ')') { tokens.push({ type: ExprTokenTypes.RPAREN }); i++; continue }
-    if (text[i] === ',') { tokens.push({ type: ExprTokenTypes.COMMA }); i++; continue }
-    if (text[i] === '*') { tokens.push({ type: ExprTokenTypes.STAR }); i++; continue }
+    if (text[i] === '(') { tokens.push({ type: ExprTokenTypes.LPAREN }); lastType = ExprTokenTypes.LPAREN; i++; continue }
+    if (text[i] === ')') { tokens.push({ type: ExprTokenTypes.RPAREN }); lastType = ExprTokenTypes.RPAREN; i++; continue }
+    if (text[i] === ',') { tokens.push({ type: ExprTokenTypes.COMMA }); lastType = ExprTokenTypes.COMMA; i++; continue }
+    if (text[i] === '*') { tokens.push({ type: ExprTokenTypes.STAR }); lastType = ExprTokenTypes.STAR; i++; continue }
 
-    // number
+    // NNS chord: digit 1-7 when previous token is not STAR
+    if (NNS_ROOTS.has(text[i]) && lastType !== ExprTokenTypes.STAR) {
+      let root = text[i]
+      i++
+      // quality
+      let quality = ''
+      while (i < text.length && QUALITY_CHARS.test(text[i]) && text[i] !== ' ' && text[i] !== ')' && text[i] !== ',' && text[i] !== '*') {
+        quality += text[i]
+        i++
+      }
+      // slash bass
+      let bass = ''
+      if (i < text.length && text[i] === '/') {
+        i++
+        if (i < text.length && (ROOTS.has(text[i]) || NNS_ROOTS.has(text[i]))) {
+          bass = text[i]
+          i++
+          if (!NNS_ROOTS.has(bass) && i < text.length && ACCIDENTALS.has(text[i])) {
+            bass += text[i]
+            i++
+          }
+        }
+      }
+      const token = { type: ExprTokenTypes.CHORD, root, quality, nashville: true }
+      if (bass) token.bass = bass
+      tokens.push(token)
+      lastType = ExprTokenTypes.CHORD
+      continue
+    }
+
+    // number (including NNS digits when after STAR)
     if (/[0-9]/.test(text[i])) {
       let num = ''
       while (i < text.length && /[0-9]/.test(text[i])) { num += text[i]; i++ }
       tokens.push({ type: ExprTokenTypes.NUMBER, value: parseInt(num, 10) })
+      lastType = ExprTokenTypes.NUMBER
       continue
     }
 
@@ -159,8 +297,10 @@ export function lexExpression(text) {
         const token = { type: ExprTokenTypes.CHORD, root, quality: rest }
         if (bass) token.bass = bass
         tokens.push(token)
+        lastType = ExprTokenTypes.CHORD
       } else {
         tokens.push({ type: ExprTokenTypes.WORD, value: word })
+        lastType = ExprTokenTypes.WORD
       }
       continue
     }
