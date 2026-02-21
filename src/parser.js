@@ -158,8 +158,10 @@ function collectExprMarkers(expr, sections) {
           if (chord.splitMeasure) marker.splitMeasure = chord.splitMeasure
           lineMarkers.push(marker)
         }
-        for (const col of line.barLines) {
-          lineMarkers.push({ col, type: 'bar' })
+        for (const bar of line.barLines) {
+          const marker = { col: bar.column, type: 'bar' }
+          if (bar.chord) marker.chord = bar.chord
+          lineMarkers.push(marker)
         }
         lineMarkers.sort((a, b) => a.col - b.col)
         result.push(...lineMarkers)
@@ -185,6 +187,7 @@ function compactMarkersToLine(markers) {
   const chords = []
   const barLines = []
   let col = 0
+  let lastChord = null
   for (const m of markers) {
     if (col > 0) col += 1
     if (m.type === 'chord') {
@@ -197,9 +200,15 @@ function compactMarkersToLine(markers) {
       if (m.stop) chord.stop = true
       if (m.splitMeasure) chord.splitMeasure = m.splitMeasure
       chords.push(chord)
+      lastChord = { root: m.root, type: m.quality }
+      if (m.bass) lastChord.bass = m.bass
+      if (m.nashville) lastChord.nashville = true
       col += name.length
     } else {
-      barLines.push(col)
+      const bar = { column: col }
+      if (m.chord) bar.chord = m.chord
+      else if (lastChord) bar.chord = lastChord
+      barLines.push(bar)
       col += 1
     }
   }
@@ -251,6 +260,7 @@ function parseChordLyricBlock(text) {
   const allChords = []
   const allLyrics = []
   let i = 0
+  let lastChord = null
 
   while (i < rawLines.length) {
     const line = rawLines[i]
@@ -260,7 +270,23 @@ function parseChordLyricBlock(text) {
       // This is a chord line — next non-chord line is its paired lyric
       const chordTokens = tokens
       const chords = tokens.filter(t => t.type === 'CHORD').map(t => tokenToPositionedChord(t))
-      const barLines = tokens.filter(t => t.type === 'BAR_LINE').map(t => t.column)
+
+      // Build barLines as objects with chord context
+      // Sort all tokens by column, walk left-to-right tracking currentChord
+      const sortedTokens = [...tokens].sort((a, b) => a.column - b.column)
+      let currentChord = lastChord
+      const barLines = []
+      for (const tok of sortedTokens) {
+        if (tok.type === 'CHORD') {
+          currentChord = tokenToChord(tok)
+        } else if (tok.type === 'BAR_LINE') {
+          const bar = { column: tok.column }
+          if (currentChord) bar.chord = currentChord
+          barLines.push(bar)
+        }
+      }
+      // Update lastChord for the next line
+      if (currentChord) lastChord = currentChord
 
       i++
       // Find the paired lyric line (next line that isn't a chord line)

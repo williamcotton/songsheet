@@ -306,7 +306,12 @@ describe('bar line parsing', () => {
   it('parses bar lines in chord lines', () => {
     const song = parse('TEST SONG - AUTHOR\n\n| G | C | D |\nSome lyrics here')
     const line = song.structure[0].lines[0]
-    expect(line.barLines).toEqual([0, 4, 8, 12])
+    expect(line.barLines).toEqual([
+      { column: 0 },
+      { column: 4, chord: { root: 'G', type: '' } },
+      { column: 8, chord: { root: 'C', type: '' } },
+      { column: 12, chord: { root: 'D', type: '' } },
+    ])
     expect(line.chords.map(c => c.root)).toEqual(['G', 'C', 'D'])
   })
 
@@ -315,5 +320,17 @@ describe('bar line parsing', () => {
     const chars = song.structure[0].lines[0].characters
     expect(chars[0].barLine).toBe(true)
     expect(chars[4].barLine).toBe(true)
+  })
+
+  it('carries chord across lines for leading bar lines', () => {
+    const song = parse('TEST SONG - AUTHOR\n\n  C   |   F  C\nline one\n  |        |               G         |\nline two')
+    const lines = song.structure[0].lines
+    // Line 1: C at col 2, | at col 6, F at col 10, C at col 13
+    expect(lines[0].chords.map(c => c.root)).toEqual(['C', 'F', 'C'])
+    // Line 2 starts with | — should carry C from end of line 1
+    expect(lines[1].barLines[0].chord).toEqual({ root: 'C', type: '' })
+    expect(lines[1].barLines[1].chord).toEqual({ root: 'C', type: '' })
+    // After G chord, the trailing | should carry G
+    expect(lines[1].barLines[2].chord).toEqual({ root: 'G', type: '' })
   })
 })

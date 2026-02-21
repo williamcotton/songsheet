@@ -1,6 +1,6 @@
 {
   "name": "songsheet",
-  "version": "6.2.0",
+  "version": "6.3.0",
   "description": "A songsheet interpreter",
   "type": "module",
   "exports": "./index.js",

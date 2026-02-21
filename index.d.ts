@@ -19,9 +19,14 @@ export interface Character {
   barLine?: true
 }
 
+export interface BarLine {
+  column: number
+  chord?: Chord
+}
+
 export interface Line {
   chords: PositionedChord[]
-  barLines: number[]
+  barLines: BarLine[]
   lyrics: string
   characters: Character[]
 }
