@@ -186,8 +186,8 @@ export function scanChordLine(line) {
     return null
   }
 
-  // must have at least one chord
-  if (!tokens.some(t => t.type === 'CHORD')) return null
+  // must have at least one chord or bar line
+  if (tokens.length === 0) return null
 
   return tokens
 }
