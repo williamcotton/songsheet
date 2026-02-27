@@ -22,14 +22,12 @@ describe('buildPlaybackTimeline', () => {
     })
   })
 
-  describe('barlines present — chords grouped into measures', () => {
-    it('| G | C | D | creates 3 measures, 1 chord each', () => {
+  describe('barlines present — bars repeat measures (no multi-chord grouping)', () => {
+    it('| G | C | D | repeats each bar-marked chord', () => {
       const song = parse('TITLE\n\n| G | C | D |\n Lyrics')
       const playback = song.playback
-      expect(playback.length).toBe(3)
-      expect(playback[0].chords[0].root).toBe('G')
-      expect(playback[1].chords[0].root).toBe('C')
-      expect(playback[2].chords[0].root).toBe('D')
+      expect(playback.length).toBe(6)
+      expect(playback.map(m => m.chords[0].root)).toEqual(['G', 'G', 'C', 'C', 'D', 'D'])
       for (const m of playback) {
         expect(m.chords.length).toBe(1)
         expect(m.chords[0].beatStart).toBe(0)
@@ -46,19 +44,16 @@ describe('buildPlaybackTimeline', () => {
       expect(playback[2].chords[0].root).toBe('D')
     })
 
-    it('| C D | G | groups by barlines when inter-barlines present', () => {
+    it('| C D | G | does not form multi-chord measures without brackets', () => {
       const song = parse('TITLE\n\n| C D | G |\n Lyrics')
       const playback = song.playback
-      // Barline between D and G → barline grouping applies
-      expect(playback.length).toBe(2)
-      expect(playback[0].chords.length).toBe(2)
-      expect(playback[0].chords[0].root).toBe('C')
-      expect(playback[0].chords[0].beatStart).toBe(0)
-      expect(playback[0].chords[0].durationInBeats).toBe(2)
-      expect(playback[0].chords[1].root).toBe('D')
-      expect(playback[0].chords[1].beatStart).toBe(2)
-      expect(playback[0].chords[1].durationInBeats).toBe(2)
-      expect(playback[1].chords[0].root).toBe('G')
+      expect(playback.length).toBe(5)
+      expect(playback.map(m => m.chords[0].root)).toEqual(['C', 'D', 'D', 'G', 'G'])
+      for (const m of playback) {
+        expect(m.chords.length).toBe(1)
+        expect(m.chords[0].beatStart).toBe(0)
+        expect(m.chords[0].durationInBeats).toBe(4)
+      }
     })
 
     it('sparse inter-barline usage stays chord-per-measure with bar repeat', () => {
@@ -157,15 +152,15 @@ describe('buildPlaybackTimeline', () => {
       expect(playback[0].timeSignature.beats).toBe(3)
     })
 
-    it('inter-barline grouping divides beats by 3', () => {
+    it('barline repeats in 3/4 remain full-measure chords', () => {
       const song = parse('TITLE\n(3/4 time)\n\n| G | C D |\n Lyrics')
       const playback = song.playback
-      expect(playback.length).toBe(2)
-      expect(playback[0].chords[0].root).toBe('G')
-      expect(playback[0].chords[0].durationInBeats).toBe(3)
-      expect(playback[1].chords.length).toBe(2)
-      expect(playback[1].chords[0].durationInBeats).toBe(1.5)
-      expect(playback[1].chords[1].durationInBeats).toBe(1.5)
+      expect(playback.length).toBe(5)
+      expect(playback.map(m => m.chords[0].root)).toEqual(['G', 'G', 'C', 'D', 'D'])
+      for (const m of playback) {
+        expect(m.chords.length).toBe(1)
+        expect(m.chords[0].durationInBeats).toBe(3)
+      }
     })
   })
 
@@ -191,11 +186,13 @@ describe('buildPlaybackTimeline', () => {
       expect(song.playback[2].chords[0].markerIndex).toBe(2) // trailing bar marker
     })
 
-    it('assigns markerIndex for grouped barline measures', () => {
+    it('assigns markerIndex for bar repeats without barline grouping', () => {
       const song = parse('TITLE\n\n| C D | G |\n Lyrics')
       expect(song.playback[0].chords[0].markerIndex).toBe(1) // C marker
-      expect(song.playback[0].chords[1].markerIndex).toBe(2) // D marker
-      expect(song.playback[1].chords[0].markerIndex).toBe(4) // G marker
+      expect(song.playback[1].chords[0].markerIndex).toBe(2) // D marker
+      expect(song.playback[2].chords[0].markerIndex).toBe(3) // repeated D at bar marker
+      expect(song.playback[3].chords[0].markerIndex).toBe(4) // G marker
+      expect(song.playback[4].chords[0].markerIndex).toBe(5) // repeated G at bar marker
     })
   })
 

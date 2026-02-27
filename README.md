@@ -165,13 +165,16 @@ Examples: `(VERSE, CHORUS*2)`, `(D G D A)*4`, `D G D A D`
 
 Playback is derived from each line's chords and `|` markers using these rules:
 
-1. Dense explicit bars group chords by bar boundaries (example: `| G | C | D |` -> `G`, `C`, `D`).
-2. Otherwise, each chord is its own measure and each `|` repeats a measure.
+1. Each chord token is its own measure unless written as bracket split syntax (`[C D]`).
+2. Each `|` repeats a measure.
 3. Barline repeats use chord context carried by the parser, so leading bars on a line can repeat the previous line's chord.
 
 Examples:
 
+- `[C D]` -> one measure split evenly between `C` and `D`
 - `C D |` -> `C`, `D`, `D`
+- `| C D |` -> `C`, `D`, `D`
+- `| G | C | D |` -> `G`, `G`, `C`, `C`, `D`, `D`
 - `C C/B Am G F | Fsus4 F` -> `C`, `C/B`, `Am`, `G`, `F`, `F`, `Fsus4`, `F`
 - `C | F C` then `| | G |` -> `C`, `C`, `F`, `C`, `C`, `C`, `G`, `G`
 

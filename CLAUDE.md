@@ -124,7 +124,7 @@ npx vitest run test/parser.test.js   # single file
 - **Column preservation**: Chord lines are never trimmed — column positions match the original file
 - **Title metadata**: BPM and time signature parsed from `(120 BPM, 3/4 time)` in the title block
 - **Playback timeline**: parser output includes `playback[]` measures with `beatStart`/`durationInBeats` and optional `markerIndex` for UI highlighting
-- **Barline playback semantics**: dense explicit bars group chords by measures; otherwise each chord is a measure and each `|` repeats
+- **Strict bracket split syntax**: only `[A B ...]` creates multi-chord measures; `|` markers repeat measures and never group adjacent chords
 - **TypeScript types**: `index.d.ts` adjacent to `index.js` — consumers get types automatically with bundler module resolution
 
 ## Songsheet Format
