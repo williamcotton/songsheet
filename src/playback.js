@@ -45,6 +45,25 @@ function buildMeasure(chords, measureIndex, structureIndex, lineIndex, ts) {
 }
 
 /**
+ * Check if barlines on this line actually separate chords (e.g., | G | C | D |)
+ * vs. just trailing after all chords (e.g., A C D |).
+ * Returns true only when a barline appears between two chords.
+ */
+function detectInterBarlines(markers) {
+  let seenChord = false
+  let seenBarAfterChord = false
+  for (const m of markers) {
+    if (m.type === 'chord') {
+      if (seenBarAfterChord) return true
+      seenChord = true
+    } else if (m.type === 'bar' && seenChord) {
+      seenBarAfterChord = true
+    }
+  }
+  return false
+}
+
+/**
  * Build the playback timeline from the song's structure array.
  *
  * @param {Array} structure - song.structure entries
@@ -75,9 +94,12 @@ export function buildPlaybackTimeline(structure, timeSignature) {
         }
         markers.sort((a, b) => a.col - b.col)
 
-        const hasBarlines = line.barLines.length > 0
+        // Detect whether barlines actually separate chords on this line.
+        // Pattern: chord...bar...chord means barlines are measure separators.
+        // Pattern: chord chord... bar (trailing only) means barlines are phrase markers.
+        const hasInterBarlines = detectInterBarlines(markers)
 
-        if (hasBarlines) {
+        if (hasInterBarlines) {
           // Group chords by barline boundaries
           let currentChords = []
           for (const m of markers) {
@@ -99,11 +121,18 @@ export function buildPlaybackTimeline(structure, timeSignature) {
             measureIndex++
           }
         } else {
-          // No barlines: each chord is its own measure
-          for (const chord of line.chords) {
-            const expanded = expandChord(chord)
-            measures.push(buildMeasure(expanded, measureIndex, si, li, ts))
-            measureIndex++
+          // No inter-barlines: each chord is its own measure.
+          // Trailing barlines repeat the preceding chord for one additional measure.
+          let lastExpanded = null
+          for (const m of markers) {
+            if (m.type === 'chord') {
+              lastExpanded = expandChord(m.chord)
+              measures.push(buildMeasure(lastExpanded, measureIndex, si, li, ts))
+              measureIndex++
+            } else if (m.type === 'bar' && lastExpanded) {
+              measures.push(buildMeasure([...lastExpanded], measureIndex, si, li, ts))
+              measureIndex++
+            }
           }
         }
       }

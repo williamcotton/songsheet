@@ -37,10 +37,20 @@ describe('buildPlaybackTimeline', () => {
       }
     })
 
-    it('| C D | creates 1 measure with 2 chords at beats 0 and 2', () => {
-      const song = parse('TITLE\n\n| C D |\n Lyrics')
+    it('trailing barline repeats last chord: C D | → C, D, D', () => {
+      const song = parse('TITLE\n\nC D |\n Lyrics')
       const playback = song.playback
-      expect(playback.length).toBe(1)
+      expect(playback.length).toBe(3)
+      expect(playback[0].chords[0].root).toBe('C')
+      expect(playback[1].chords[0].root).toBe('D')
+      expect(playback[2].chords[0].root).toBe('D')
+    })
+
+    it('| C D | G | groups by barlines when inter-barlines present', () => {
+      const song = parse('TITLE\n\n| C D | G |\n Lyrics')
+      const playback = song.playback
+      // Barline between D and G → barline grouping applies
+      expect(playback.length).toBe(2)
       expect(playback[0].chords.length).toBe(2)
       expect(playback[0].chords[0].root).toBe('C')
       expect(playback[0].chords[0].beatStart).toBe(0)
@@ -48,22 +58,24 @@ describe('buildPlaybackTimeline', () => {
       expect(playback[0].chords[1].root).toBe('D')
       expect(playback[0].chords[1].beatStart).toBe(2)
       expect(playback[0].chords[1].durationInBeats).toBe(2)
+      expect(playback[1].chords[0].root).toBe('G')
     })
 
-    it('D | creates 1 measure with D getting full measure', () => {
+    it('D | creates 2 measures: D then barline repeats D', () => {
       const song = parse('TITLE\n\nD |\n Lyrics')
       const playback = song.playback
-      expect(playback.length).toBe(1)
-      expect(playback[0].chords.length).toBe(1)
+      expect(playback.length).toBe(2)
       expect(playback[0].chords[0].root).toBe('D')
-      expect(playback[0].chords[0].durationInBeats).toBe(4)
+      expect(playback[1].chords[0].root).toBe('D')
     })
 
-    it('leading | with no preceding chords is discarded', () => {
+    it('| G | with no inter-barlines: G then barline repeats G', () => {
       const song = parse('TITLE\n\n| G |\n Lyrics')
       const playback = song.playback
-      expect(playback.length).toBe(1)
+      // Leading | has no preceding chord → ignored. G then trailing | repeats G.
+      expect(playback.length).toBe(2)
       expect(playback[0].chords[0].root).toBe('G')
+      expect(playback[1].chords[0].root).toBe('G')
     })
   })
 
@@ -111,15 +123,23 @@ describe('buildPlaybackTimeline', () => {
   })
 
   describe('3/4 time signature', () => {
-    it('divides beats by 3', () => {
-      const song = parse('TITLE\n(3/4 time)\n\n| G C D |\n Lyrics')
+    it('uses 3 beats per measure', () => {
+      const song = parse('TITLE\n(3/4 time)\n\nG\n Lyrics')
       const playback = song.playback
       expect(playback.length).toBe(1)
-      expect(playback[0].chords.length).toBe(3)
-      expect(playback[0].chords[0].durationInBeats).toBe(1)
-      expect(playback[0].chords[1].durationInBeats).toBe(1)
-      expect(playback[0].chords[2].durationInBeats).toBe(1)
+      expect(playback[0].chords[0].durationInBeats).toBe(3)
       expect(playback[0].timeSignature.beats).toBe(3)
+    })
+
+    it('inter-barline grouping divides beats by 3', () => {
+      const song = parse('TITLE\n(3/4 time)\n\n| G | C D |\n Lyrics')
+      const playback = song.playback
+      expect(playback.length).toBe(2)
+      expect(playback[0].chords[0].root).toBe('G')
+      expect(playback[0].chords[0].durationInBeats).toBe(3)
+      expect(playback[1].chords.length).toBe(2)
+      expect(playback[1].chords[0].durationInBeats).toBe(1.5)
+      expect(playback[1].chords[1].durationInBeats).toBe(1.5)
     })
   })
 
@@ -153,18 +173,14 @@ describe('buildPlaybackTimeline', () => {
       }
     })
 
-    it('uses barline grouping for chord lines with barlines', () => {
-      // The verse has patterns like "D  |" — D followed by barline = 1 measure
-      // Check that the first structure entry (verse) doesn't duplicate chords at barlines
+    it('trailing barlines repeat last chord: D|, G|, A C D| → D D G G A C D D', () => {
       const verseMeasures = song.playback.filter(m => m.structureIndex === 0)
-      // Verse line 1: "D                        |" — 1 chord D before barline = 1 measure
-      // Verse line 2: "G                                 |" — 1 chord G before barline = 1 measure
-      // Verse line 3: "        A                               C                                   D     |"
-      //   — 3 chords (A, C, D) before barline = 1 measure with 3 chords
-      expect(verseMeasures.length).toBe(3)
-      expect(verseMeasures[0].chords[0].root).toBe('D')
-      expect(verseMeasures[1].chords[0].root).toBe('G')
-      expect(verseMeasures[2].chords.length).toBe(3)
+      // Line 1: "D |" → D, D (barline repeats)
+      // Line 2: "G |" → G, G (barline repeats)
+      // Line 3: "A C D |" → A, C, D, D (barline repeats last)
+      expect(verseMeasures.length).toBe(8)
+      const roots = verseMeasures.map(m => m.chords[0].root)
+      expect(roots).toEqual(['D', 'D', 'G', 'G', 'A', 'C', 'D', 'D'])
     })
 
     it('measure indices are sequential', () => {
