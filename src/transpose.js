@@ -114,7 +114,9 @@ export function transpose(song, semitones, options = {}) {
         ...measure,
         chords: measure.chords.map(c => {
           const transposed = transposeChordObj(c, semitones, preferFlats)
-          return { ...transposed, beatStart: c.beatStart, durationInBeats: c.durationInBeats }
+          const playbackChord = { ...transposed, beatStart: c.beatStart, durationInBeats: c.durationInBeats }
+          if (c.markerIndex !== undefined) playbackChord.markerIndex = c.markerIndex
+          return playbackChord
         }),
       }))
     : undefined

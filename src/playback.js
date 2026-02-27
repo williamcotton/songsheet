@@ -2,7 +2,7 @@
  * Expand a chord into PlaybackChord(s). If the chord has a splitMeasure,
  * each sub-chord becomes a separate PlaybackChord; otherwise a single one.
  */
-function expandChord(chord) {
+function expandChord(chord, markerIndex) {
   if (chord.splitMeasure && chord.splitMeasure.length > 0) {
     return chord.splitMeasure.map(sc => {
       const pc = { root: sc.root, type: sc.type }
@@ -11,6 +11,7 @@ function expandChord(chord) {
       if (sc.diamond) pc.diamond = true
       if (sc.push) pc.push = true
       if (sc.stop) pc.stop = true
+      if (markerIndex !== undefined) pc.markerIndex = markerIndex
       return pc
     })
   }
@@ -20,6 +21,7 @@ function expandChord(chord) {
   if (chord.diamond) pc.diamond = true
   if (chord.push) pc.push = true
   if (chord.stop) pc.stop = true
+  if (markerIndex !== undefined) pc.markerIndex = markerIndex
   return [pc]
 }
 
@@ -127,16 +129,17 @@ export function buildPlaybackTimeline(structure, timeSignature) {
           markers.push({ col: chord.column, type: 'chord', chord })
         }
         for (const bar of line.barLines) {
-          markers.push({ col: bar.column, type: 'bar' })
+          markers.push({ col: bar.column, type: 'bar', bar })
         }
         markers.sort((a, b) => a.col - b.col)
 
         if (shouldGroupByBarlines(markers)) {
           // Group chords by barline boundaries
           let currentChords = []
-          for (const m of markers) {
+          for (let mi = 0; mi < markers.length; mi++) {
+            const m = markers[mi]
             if (m.type === 'chord') {
-              currentChords.push(...expandChord(m.chord))
+              currentChords.push(...expandChord(m.chord, mi))
             } else {
               // Bar line: flush accumulated chords as a measure
               if (currentChords.length > 0) {
@@ -156,22 +159,36 @@ export function buildPlaybackTimeline(structure, timeSignature) {
           // No inter-barlines: each chord is its own measure.
           // Trailing barlines repeat the preceding chord for one additional measure.
           let lastExpanded = null
-          for (const m of markers) {
+          for (let mi = 0; mi < markers.length; mi++) {
+            const m = markers[mi]
             if (m.type === 'chord') {
-              lastExpanded = expandChord(m.chord)
+              lastExpanded = expandChord(m.chord, mi)
               measures.push(buildMeasure(lastExpanded, measureIndex, si, li, ts))
               measureIndex++
-            } else if (m.type === 'bar' && lastExpanded) {
-              measures.push(buildMeasure([...lastExpanded], measureIndex, si, li, ts))
-              measureIndex++
+            } else if (m.type === 'bar') {
+              // Use parser-provided bar chord context when available.
+              // This enables leading bars on a new line (e.g. "| | G |")
+              // to repeat the previous line's carried chord.
+              let repeatedAtBar = null
+              if (m.bar && m.bar.chord) {
+                repeatedAtBar = expandChord(m.bar.chord, mi)
+              } else if (lastExpanded) {
+                repeatedAtBar = lastExpanded.map(c => ({ ...c, markerIndex: mi }))
+              }
+              if (repeatedAtBar) {
+                measures.push(buildMeasure(repeatedAtBar, measureIndex, si, li, ts))
+                measureIndex++
+                lastExpanded = repeatedAtBar
+              }
             }
           }
         }
       }
     } else {
       // Expression-only entries (FILL, INSTRUMENTAL, etc.) — chords only, no lines
-      for (const chord of entry.chords) {
-        const expanded = expandChord(chord)
+      for (let ci = 0; ci < entry.chords.length; ci++) {
+        const chord = entry.chords[ci]
+        const expanded = expandChord(chord, ci)
         measures.push(buildMeasure(expanded, measureIndex, si, -1, ts))
         measureIndex++
       }

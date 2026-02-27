@@ -75,6 +75,18 @@ describe('buildPlaybackTimeline', () => {
       expect(playback[7].chords[0].type).toBe('')
     })
 
+    it('leading bars on next line repeat carried chord context', () => {
+      const song = parse(
+        'TITLE\n(3/4 time)\n\nC   |   F  C\nA way out on-line\n  |        |               G         |\nA thousand miles from what I know as mine'
+      )
+      const playback = song.playback
+      const roots = playback.map(m => m.chords[0].root + (m.chords[0].bass ? '/' + m.chords[0].bass : ''))
+      expect(roots).toEqual(['C', 'C', 'F', 'C', 'C', 'C', 'G', 'G'])
+      for (const m of playback) {
+        expect(m.chords[0].durationInBeats).toBe(3)
+      }
+    })
+
     it('D | creates 2 measures: D then barline repeats D', () => {
       const song = parse('TITLE\n\nD |\n Lyrics')
       const playback = song.playback
@@ -170,6 +182,20 @@ describe('buildPlaybackTimeline', () => {
       const song = parse('TITLE\n\nG\n Line 1\n          D\n Line 2')
       expect(song.playback[0].measureIndex).toBe(0)
       expect(song.playback[1].measureIndex).toBe(1)
+    })
+
+    it('assigns playback markerIndex values for chords and bar repeats', () => {
+      const song = parse('TITLE\n\nC D |\n Lyrics')
+      expect(song.playback[0].chords[0].markerIndex).toBe(0) // C marker
+      expect(song.playback[1].chords[0].markerIndex).toBe(1) // D marker
+      expect(song.playback[2].chords[0].markerIndex).toBe(2) // trailing bar marker
+    })
+
+    it('assigns markerIndex for grouped barline measures', () => {
+      const song = parse('TITLE\n\n| C D | G |\n Lyrics')
+      expect(song.playback[0].chords[0].markerIndex).toBe(1) // C marker
+      expect(song.playback[0].chords[1].markerIndex).toBe(2) // D marker
+      expect(song.playback[1].chords[0].markerIndex).toBe(4) // G marker
     })
   })
 

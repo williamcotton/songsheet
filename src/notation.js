@@ -173,7 +173,9 @@ function convertSong(song, key, toNNS) {
         ...measure,
         chords: measure.chords.map(c => {
           const converted = convertChord(c, keySemitone, toNNS, preferFlats)
-          return { ...converted, beatStart: c.beatStart, durationInBeats: c.durationInBeats }
+          const playbackChord = { ...converted, beatStart: c.beatStart, durationInBeats: c.durationInBeats }
+          if (c.markerIndex !== undefined) playbackChord.markerIndex = c.markerIndex
+          return playbackChord
         }),
       }))
     : undefined
