@@ -64,6 +64,43 @@ function detectInterBarlines(markers) {
 }
 
 /**
+ * Detect consecutive barlines (e.g., C || D), which usually indicate
+ * repeated held measures rather than explicit bar-delimited grouping.
+ */
+function hasConsecutiveBars(markers) {
+  let prevWasBar = false
+  for (const m of markers) {
+    if (m.type === 'bar') {
+      if (prevWasBar) return true
+      prevWasBar = true
+    } else {
+      prevWasBar = false
+    }
+  }
+  return false
+}
+
+/**
+ * Decide whether a line should be grouped by explicit barline boundaries.
+ *
+ * Heuristic:
+ * - require at least one barline between chords
+ * - require barline density to be at least chord density
+ * - reject consecutive barlines (treated as hold repeats)
+ *
+ * Sparse barlines like "C C/B Am G F | Fsus4 F" stay in chord-per-measure mode.
+ */
+function shouldGroupByBarlines(markers) {
+  const chordCount = markers.filter(m => m.type === 'chord').length
+  const barCount = markers.length - chordCount
+  if (chordCount === 0 || barCount === 0) return false
+  if (!detectInterBarlines(markers)) return false
+  if (barCount < chordCount) return false
+  if (hasConsecutiveBars(markers)) return false
+  return true
+}
+
+/**
  * Build the playback timeline from the song's structure array.
  *
  * @param {Array} structure - song.structure entries
@@ -94,12 +131,7 @@ export function buildPlaybackTimeline(structure, timeSignature) {
         }
         markers.sort((a, b) => a.col - b.col)
 
-        // Detect whether barlines actually separate chords on this line.
-        // Pattern: chord...bar...chord means barlines are measure separators.
-        // Pattern: chord chord... bar (trailing only) means barlines are phrase markers.
-        const hasInterBarlines = detectInterBarlines(markers)
-
-        if (hasInterBarlines) {
+        if (shouldGroupByBarlines(markers)) {
           // Group chords by barline boundaries
           let currentChords = []
           for (const m of markers) {

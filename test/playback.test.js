@@ -61,6 +61,20 @@ describe('buildPlaybackTimeline', () => {
       expect(playback[1].chords[0].root).toBe('G')
     })
 
+    it('sparse inter-barline usage stays chord-per-measure with bar repeat', () => {
+      const song = parse('TITLE\n(3/4 time)\n\nC C/B Am G F | Fsus4 F\n Lyrics')
+      const playback = song.playback
+      expect(playback.length).toBe(8)
+      const roots = playback.map(m => m.chords[0].root + (m.chords[0].bass ? '/' + m.chords[0].bass : ''))
+      expect(roots).toEqual(['C', 'C/B', 'A', 'G', 'F', 'F', 'F', 'F'])
+      for (const m of playback) {
+        expect(m.chords.length).toBe(1)
+        expect(m.chords[0].durationInBeats).toBe(3)
+      }
+      expect(playback[6].chords[0].type).toBe('sus4')
+      expect(playback[7].chords[0].type).toBe('')
+    })
+
     it('D | creates 2 measures: D then barline repeats D', () => {
       const song = parse('TITLE\n\nD |\n Lyrics')
       const playback = song.playback
