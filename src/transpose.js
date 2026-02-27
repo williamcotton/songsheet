@@ -108,9 +108,21 @@ export function transpose(song, semitones, options = {}) {
     expression: transposeExpressionNode(entry.expression, semitones, preferFlats),
   }))
 
+  // Transpose playback timeline
+  const newPlayback = song.playback
+    ? song.playback.map(measure => ({
+        ...measure,
+        chords: measure.chords.map(c => {
+          const transposed = transposeChordObj(c, semitones, preferFlats)
+          return { ...transposed, beatStart: c.beatStart, durationInBeats: c.durationInBeats }
+        }),
+      }))
+    : undefined
+
   return {
     ...song,
     sections: newSections,
     structure: newStructure,
+    ...(newPlayback !== undefined && { playback: newPlayback }),
   }
 }

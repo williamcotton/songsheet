@@ -1,4 +1,5 @@
 import { scanChordLine, isChordLine, lexExpression, ExprTokenTypes } from './lexer.js'
+import { buildPlaybackTimeline } from './playback.js'
 
 // ─── Token-to-Chord Helpers ──────────────────────────────────────────
 
@@ -499,7 +500,8 @@ export function parse(rawSongsheet) {
     }
   }
 
-  return { title, author, bpm, timeSignature, key, sections, structure }
+  const playback = buildPlaybackTimeline(structure, timeSignature)
+  return { title, author, bpm, timeSignature, key, sections, structure, playback }
 }
 
 function inferSectionType(sections, lyrics, chords) {

@@ -149,30 +149,3 @@ Atom       = SectionRef | ChordList | '(' Sequence ')'
 ```
 
 Examples: `(VERSE, CHORUS*2)`, `(D G D A)*4`, `D G D A D`
-
-## Future Features
-
-### Percentage-based timing (`%`)
-Support `%` notation for specifying timing or duration within a measure:
-
-```
-G%50 C%50            — split measure: 50% G, 50% C
-D%75 G%25            — 3/4 D, 1/4 G
-```
-
-This would add a `duration` or `percent` field to chord objects:
-```js
-{ root: 'G', type: '', percent: 50 }
-```
-
-### Key detection
-Auto-detect the song's key from its chord progression. Useful for intelligent transposition suggestions.
-
-### Measure/bar grouping
-Currently `|` markers are tracked by column position. Future: group chords into explicit measures with bar lines as structural delimiters.
-
-### Multi-voice / harmony lines
-Support for parallel harmony notation — multiple chord lines mapped to the same lyric line.
-
-### Nashville number system output
-Convert chord roots to Nashville numbers (1, 2, 3...) relative to the detected or specified key.

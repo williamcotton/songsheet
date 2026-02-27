@@ -58,6 +58,26 @@ export interface TimeSignature {
   value: number
 }
 
+export interface PlaybackChord {
+  root: string
+  type: string
+  bass?: string
+  nashville?: boolean
+  diamond?: boolean
+  push?: boolean
+  stop?: boolean
+  beatStart: number
+  durationInBeats: number
+}
+
+export interface PlaybackMeasure {
+  measureIndex: number
+  structureIndex: number
+  lineIndex: number
+  timeSignature: TimeSignature
+  chords: PlaybackChord[]
+}
+
 export interface Song {
   title: string
   author: string
@@ -66,9 +86,11 @@ export interface Song {
   key: string | null
   sections: Record<string, Section>
   structure: StructureEntry[]
+  playback: PlaybackMeasure[]
 }
 
 export function parse(raw: string): Song
 export function transpose(song: Song, semitones: number, options?: { preferFlats?: boolean }): Song
 export function toNashville(song: Song, key: string): Song
 export function toStandard(song: Song, key: string): Song
+export function buildPlaybackTimeline(structure: StructureEntry[], timeSignature: TimeSignature | null): PlaybackMeasure[]

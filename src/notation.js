@@ -167,10 +167,22 @@ function convertSong(song, key, toNNS) {
     expression: convertExpressionNode(entry.expression, keySemitone, toNNS, preferFlats),
   }))
 
+  // Convert playback timeline
+  const newPlayback = song.playback
+    ? song.playback.map(measure => ({
+        ...measure,
+        chords: measure.chords.map(c => {
+          const converted = convertChord(c, keySemitone, toNNS, preferFlats)
+          return { ...converted, beatStart: c.beatStart, durationInBeats: c.durationInBeats }
+        }),
+      }))
+    : undefined
+
   return {
     ...song,
     sections: newSections,
     structure: newStructure,
+    ...(newPlayback !== undefined && { playback: newPlayback }),
   }
 }
 
