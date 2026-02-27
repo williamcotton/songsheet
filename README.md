@@ -1,6 +1,6 @@
 # songsheet
 
-A zero-dependency songsheet parser and transposer. Parses plaintext songsheet files into a structured AST with chord-lyric character alignment.
+A zero-dependency songsheet parser and transposer. Parses plaintext songsheet files into a structured AST with chord-lyric alignment and builds a playback timeline.
 
 ## Install
 
@@ -111,10 +111,13 @@ Examples: `(VERSE, CHORUS*2)`, `(D G D A)*4`, `D G D A D`
       lines: [
         {
           chords: [{ root: 'G', type: '', column: 0 }, ...],
-          barLines: [],           // column positions of | markers
+          barLines: [             // | markers with optional carried chord context
+            { column: 12, chord: { root: 'G', type: '' } }
+          ],
           lyrics: 'lyric line 1',
           characters: [
             { character: 'B', chord: { root: 'G', type: '' } },
+            { character: '|', barLine: true },
             { character: 'l' },
             ...
           ]
@@ -135,13 +138,46 @@ Examples: `(VERSE, CHORUS*2)`, `(D G D A)*4`, `D G D A D`
       expression: null,   // non-null on directive entries
     },
     ...
+  ],
+
+  // Flattened playback timeline (measure-by-measure)
+  playback: [
+    {
+      measureIndex: 0,
+      structureIndex: 0,
+      lineIndex: 0,
+      timeSignature: { beats: 3, value: 4 },
+      chords: [
+        {
+          root: 'G',
+          type: '',
+          markerIndex: 0,       // marker index in the rendered line (optional)
+          beatStart: 0,
+          durationInBeats: 3
+        }
+      ]
+    }
   ]
 }
 ```
 
+## Playback Barline Semantics
+
+Playback is derived from each line's chords and `|` markers using these rules:
+
+1. Dense explicit bars group chords by bar boundaries (example: `| G | C | D |` -> `G`, `C`, `D`).
+2. Otherwise, each chord is its own measure and each `|` repeats a measure.
+3. Barline repeats use chord context carried by the parser, so leading bars on a line can repeat the previous line's chord.
+
+Examples:
+
+- `C D |` -> `C`, `D`, `D`
+- `C C/B Am G F | Fsus4 F` -> `C`, `C/B`, `Am`, `G`, `F`, `F`, `Fsus4`, `F`
+- `C | F C` then `| | G |` -> `C`, `C`, `F`, `C`, `C`, `C`, `G`, `G`
+
 ## Transposition
 
-`transpose()` deep-walks the AST and replaces every chord root (and bass note on slash chords). It auto-detects whether the song uses flats or sharps, or you can override with `{ preferFlats: true }`.
+`transpose()` deep-walks the AST and replaces every chord root (and bass note on slash chords). It auto-detects whether the song uses flats or sharps, or you can override with `{ preferFlats: true }`. Playback timing metadata (`beatStart`, `durationInBeats`, `markerIndex`) is preserved.
 
 ```js
 const song = parse(rawText)

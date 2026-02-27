@@ -1,6 +1,6 @@
 # Songsheet
 
-A zero-dependency songsheet parser and transposer. Parses plaintext songsheet files into a structured AST with chord-lyric character alignment.
+A zero-dependency songsheet parser and transposer. Parses plaintext songsheet files into a structured AST with chord-lyric character alignment and a playback timeline.
 
 ## Quick Start
 
@@ -15,16 +15,20 @@ const songInBb = transpose(song, 3, { preferFlats: true })
 ## Architecture
 
 ```
-index.js              — Public API: re-exports parse + transpose
+index.js              — Public API: parse, transpose, toNashville, toStandard, buildPlaybackTimeline
 index.d.ts            — TypeScript type definitions (adjacent to index.js)
 src/
   lexer.js            — scanChordLine(), isChordLine(), lexExpression()
   parser.js           — parse(), expression parser, section assembly
+  playback.js         — buildPlaybackTimeline(), barline/measure expansion
+  notation.js         — toNashville(), toStandard()
   transpose.js        — transpose(), note math
 test/
   lexer.test.js       — Chord line detection, bar lines, slash chords, edge cases
   parser.test.js      — All 4 song fixture tests + bar line + time signature tests
   expression.test.js  — Expression parsing and resolution
+  playback.test.js    — Timeline generation, barline semantics, marker indexing
+  nns.test.js         — Nashville Number System parsing/conversion coverage
   transpose.test.js   — Semitone math, round-trips, flat/sharp preference, slash chords
 *.txt                 — Song fixtures (do not modify)
 ```
@@ -62,10 +66,13 @@ npx vitest run test/parser.test.js   # single file
       lines: [
         {
           chords: [{ root: 'G', type: '', column: 0 }, ...],
-          barLines: [],           // column positions of | markers
+          barLines: [
+            { column: 12, chord: { root: 'G', type: '' } }  // optional carried context
+          ],
           lyrics: 'lyric line 1',
           characters: [
             { character: 'B', chord: { root: 'G', type: '' } },
+            { character: '|', barLine: true },
             { character: 'l' },
             ...
           ]
@@ -84,6 +91,23 @@ npx vitest run test/parser.test.js   # single file
       expression: null,   // non-null on directive entries
     },
     ...
+  ],
+  playback: [
+    {
+      measureIndex: 0,
+      structureIndex: 0,
+      lineIndex: 0,
+      timeSignature: { beats: 3, value: 4 },
+      chords: [
+        {
+          root: 'G',
+          type: '',
+          markerIndex: 0,        // marker index in merged chord/bar marker row (optional)
+          beatStart: 0,
+          durationInBeats: 3
+        }
+      ]
+    }
   ]
 }
 ```
@@ -96,8 +120,11 @@ npx vitest run test/parser.test.js   # single file
 - **Synchronous parse**: No Promise wrapper, plain objects (no Immutable.js)
 - **Expression AST preserved**: `(VERSE, CHORUS*2)` stored as tree AND resolved to flat chords
 - **Character alignment includes barLines**: `{ character: 'r', barLine: true }` at `|` column positions
+- **Barline context is carried across chord lines**: leading `|` on a new line can repeat the prior chord
 - **Column preservation**: Chord lines are never trimmed — column positions match the original file
 - **Title metadata**: BPM and time signature parsed from `(120 BPM, 3/4 time)` in the title block
+- **Playback timeline**: parser output includes `playback[]` measures with `beatStart`/`durationInBeats` and optional `markerIndex` for UI highlighting
+- **Barline playback semantics**: dense explicit bars group chords by measures; otherwise each chord is a measure and each `|` repeats
 - **TypeScript types**: `index.d.ts` adjacent to `index.js` — consumers get types automatically with bundler module resolution
 
 ## Songsheet Format
