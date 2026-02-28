@@ -66,6 +66,7 @@ export interface PlaybackChord {
   diamond?: boolean
   push?: boolean
   stop?: boolean
+  markerIndex?: number
   beatStart: number
   durationInBeats: number
 }
