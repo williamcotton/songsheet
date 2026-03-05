@@ -67,6 +67,7 @@ export interface PlaybackChord {
   push?: boolean
   stop?: boolean
   markerIndex?: number
+  splitIndex?: number
   beatStart: number
   durationInBeats: number
 }

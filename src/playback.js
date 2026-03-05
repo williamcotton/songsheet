@@ -4,7 +4,7 @@
  */
 function expandChord(chord, markerIndex) {
   if (chord.splitMeasure && chord.splitMeasure.length > 0) {
-    return chord.splitMeasure.map(sc => {
+    return chord.splitMeasure.map((sc, index) => {
       const pc = { root: sc.root, type: sc.type }
       if (sc.bass) pc.bass = sc.bass
       if (sc.nashville) pc.nashville = true
@@ -12,6 +12,7 @@ function expandChord(chord, markerIndex) {
       if (sc.push) pc.push = true
       if (sc.stop) pc.stop = true
       if (markerIndex !== undefined) pc.markerIndex = markerIndex
+      pc.splitIndex = index
       return pc
     })
   }

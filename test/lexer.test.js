@@ -130,6 +130,65 @@ describe('scanChordLine slash chords', () => {
   })
 })
 
+describe('scanChordLine split measures', () => {
+  it('parses same-line split measure [G C]', () => {
+    const tokens = scanChordLine('[G C]')
+    expect(tokens).not.toBeNull()
+    expect(tokens.length).toBe(1)
+    expect(tokens[0].type).toBe('CHORD')
+    expect(tokens[0].splitMeasure).toEqual([
+      { root: 'G', type: '' },
+      { root: 'C', type: '' },
+    ])
+  })
+
+  it('parses cross-line split open: [F at end of line', () => {
+    const tokens = scanChordLine('G                               [F')
+    expect(tokens).not.toBeNull()
+    expect(tokens.length).toBe(2)
+    expect(tokens[0]).toMatchObject({ type: 'CHORD', root: 'G' })
+    expect(tokens[1].type).toBe('SPLIT_OPEN')
+    expect(tokens[1].chords).toEqual([{ root: 'F', type: '' }])
+  })
+
+  it('parses cross-line split close with continueSplit', () => {
+    const tokens = scanChordLine('               C]                G', { continueSplit: true })
+    expect(tokens).not.toBeNull()
+    const closeToken = tokens.find(t => t.type === 'SPLIT_CLOSE')
+    expect(closeToken).toBeDefined()
+    expect(closeToken.chords).toEqual([{ root: 'C', type: '' }])
+    // Rest of line parsed normally
+    const chordTokens = tokens.filter(t => t.type === 'CHORD')
+    expect(chordTokens.length).toBe(1)
+    expect(chordTokens[0].root).toBe('G')
+  })
+
+  it('returns null for continueSplit when no ] found', () => {
+    const tokens = scanChordLine('C G', { continueSplit: true })
+    expect(tokens).toBeNull()
+  })
+
+  it('returns null for continueSplit on a lyric line', () => {
+    const tokens = scanChordLine('Blue mountain road', { continueSplit: true })
+    expect(tokens).toBeNull()
+  })
+
+  it('parses split open with multiple chords: [F C', () => {
+    const tokens = scanChordLine('[F C')
+    expect(tokens).not.toBeNull()
+    expect(tokens[0].type).toBe('SPLIT_OPEN')
+    expect(tokens[0].chords).toEqual([
+      { root: 'F', type: '' },
+      { root: 'C', type: '' },
+    ])
+  })
+
+  it('returns null for [ with no chords', () => {
+    const tokens = scanChordLine('[')
+    expect(tokens).toBeNull()
+  })
+})
+
 describe('lexExpression', () => {
   it('tokenizes simple chord list', () => {
     const tokens = lexExpression('D G D A')

@@ -302,6 +302,63 @@ describe('time signature parsing', () => {
   })
 })
 
+describe('cross-line split measure parsing', () => {
+  it('parses cross-line split [F ... C] across chord lines', () => {
+    const song = parse(
+      'TEST - AUTHOR\n\n' +
+      'G                               [F\n' +
+      ' Blue mountain road, North Carolina,\n' +
+      '               C]                G\n' +
+      " I've been to Asheville once before"
+    )
+    const lines = song.structure[0].lines
+    // First line should have G and the split chord (F + C)
+    expect(lines[0].chords.length).toBe(2)
+    expect(lines[0].chords[0].root).toBe('G')
+    expect(lines[0].chords[1].root).toBe('F')
+    expect(lines[0].chords[1].splitMeasure).toEqual([
+      { root: 'F', type: '' },
+      { root: 'C', type: '' },
+    ])
+    // Second line should have G (after the ])
+    expect(lines[1].chords.length).toBe(1)
+    expect(lines[1].chords[0].root).toBe('G')
+  })
+
+  it('pairs lyrics correctly with cross-line split', () => {
+    const song = parse(
+      'TEST - AUTHOR\n\n' +
+      'G                               [F\n' +
+      ' Blue mountain road\n' +
+      '               C]                G\n' +
+      ' Asheville town'
+    )
+    const lines = song.structure[0].lines
+    expect(lines[0].lyrics).toBe(' Blue mountain road')
+    expect(lines[1].lyrics).toBe(' Asheville town')
+  })
+
+  it('includes split measure chords in section allChords', () => {
+    const song = parse(
+      'TEST - AUTHOR\n\n' +
+      'G [F\n' +
+      ' Lyrics one\n' +
+      'C] D\n' +
+      ' Lyrics two'
+    )
+    // allChords should include G, the split chord (F+C), and D
+    const chords = song.structure[0].chords
+    expect(chords.length).toBe(3)
+    expect(chords[0].root).toBe('G')
+    expect(chords[1].root).toBe('F')
+    expect(chords[1].splitMeasure).toEqual([
+      { root: 'F', type: '' },
+      { root: 'C', type: '' },
+    ])
+    expect(chords[2].root).toBe('D')
+  })
+})
+
 describe('bar line parsing', () => {
   it('parses bar lines in chord lines', () => {
     const song = parse('TEST SONG - AUTHOR\n\n| G | C | D |\nSome lyrics here')

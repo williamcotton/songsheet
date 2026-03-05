@@ -262,15 +262,111 @@ function parseChordLyricBlock(text) {
   const allLyrics = []
   let i = 0
   let lastChord = null
+  let pendingSplit = null // tracks cross-line split measure state
 
   while (i < rawLines.length) {
     const line = rawLines[i]
+
+    // If we have a pending split open, try to parse this line with continueSplit first
+    if (pendingSplit) {
+      const contTokens = scanChordLine(line, { continueSplit: true })
+      if (contTokens) {
+        // Found the SPLIT_CLOSE — merge with the open chords
+        const closeToken = contTokens.find(t => t.type === 'SPLIT_CLOSE')
+        if (closeToken) {
+          const allSplitChords = [...pendingSplit.openChords, ...closeToken.chords]
+          const splitMeasure = allSplitChords
+          // Update the chord on the earlier line with the complete splitMeasure
+          const earlierChord = pendingSplit.lineData.chords[pendingSplit.chordIndex]
+          earlierChord.splitMeasure = splitMeasure
+          // Also update the allChords entry
+          const allChordsEntry = allChords[pendingSplit.allChordsIndex]
+          if (allChordsEntry) {
+            allChordsEntry.splitMeasure = splitMeasure
+          }
+
+          // Now process the rest of the tokens on this line (chords/bars after the ] )
+          const restTokens = contTokens.filter(t => t.type !== 'SPLIT_CLOSE')
+          const restChords = restTokens.filter(t => t.type === 'CHORD').map(t => tokenToPositionedChord(t))
+
+          // Build barLines for this line
+          const sortedTokens = [...contTokens].sort((a, b) => a.column - b.column)
+          let currentChord = lastChord
+          const barLines = []
+          for (const tok of sortedTokens) {
+            if (tok.type === 'CHORD') {
+              currentChord = tokenToChord(tok)
+            } else if (tok.type === 'BAR_LINE') {
+              const bar = { column: tok.column }
+              if (currentChord) bar.chord = currentChord
+              barLines.push(bar)
+            }
+            // SPLIT_CLOSE doesn't update currentChord (those chords belong to the previous line)
+          }
+          if (currentChord) lastChord = currentChord
+
+          pendingSplit = null
+          i++
+
+          // Find the paired lyric line
+          let lyricLine = ''
+          if (i < rawLines.length) {
+            // Check if next line is a chord line (with or without continueSplit)
+            const nextIsChord = scanChordLine(rawLines[i])
+            if (!nextIsChord) {
+              lyricLine = rawLines[i]
+              i++
+            }
+          }
+
+          allChords.push(...restChords.map(c => {
+            const ch = { root: c.root, type: c.type }
+            if (c.bass) ch.bass = c.bass
+            if (c.nashville) ch.nashville = true
+            if (c.diamond) ch.diamond = true
+            if (c.push) ch.push = true
+            if (c.stop) ch.stop = true
+            if (c.splitMeasure) ch.splitMeasure = c.splitMeasure
+            return ch
+          }))
+          if (lyricLine) allLyrics.push(lyricLine)
+
+          lines.push({
+            chords: restChords,
+            barLines,
+            lyrics: lyricLine,
+            characters: buildCharacterAlignment(restTokens, lyricLine),
+          })
+          continue
+        }
+      }
+      // If continueSplit didn't match, this line is a lyric line between split lines
+      // (fall through to normal handling below)
+    }
+
     const tokens = scanChordLine(line)
 
     if (tokens) {
+      // Check for SPLIT_OPEN token (cross-line split)
+      const splitOpenToken = tokens.find(t => t.type === 'SPLIT_OPEN')
+
       // This is a chord line — next non-chord line is its paired lyric
-      const chordTokens = tokens
-      const chords = tokens.filter(t => t.type === 'CHORD').map(t => tokenToPositionedChord(t))
+      const chordTokens = tokens.filter(t => t.type !== 'SPLIT_OPEN')
+      // For SPLIT_OPEN, create a positioned chord from the first open chord at the [ column
+      const chords = []
+      for (const t of tokens) {
+        if (t.type === 'CHORD') {
+          chords.push(tokenToPositionedChord(t))
+        } else if (t.type === 'SPLIT_OPEN') {
+          // Add the first chord of the split as a positioned chord
+          const first = t.chords[0]
+          const chord = { root: first.root, type: first.type, column: t.column }
+          if (first.bass) chord.bass = first.bass
+          if (first.nashville) chord.nashville = true
+          // splitMeasure will be set later when we find the SPLIT_CLOSE
+          chords.push(chord)
+        }
+      }
 
       // Build barLines as objects with chord context
       // Sort all tokens by column, walk left-to-right tracking currentChord
@@ -278,8 +374,16 @@ function parseChordLyricBlock(text) {
       let currentChord = lastChord
       const barLines = []
       for (const tok of sortedTokens) {
-        if (tok.type === 'CHORD') {
-          currentChord = tokenToChord(tok)
+        if (tok.type === 'CHORD' || tok.type === 'SPLIT_OPEN') {
+          if (tok.type === 'CHORD') {
+            currentChord = tokenToChord(tok)
+          } else {
+            // Use first chord of split open
+            const first = tok.chords[0]
+            currentChord = { root: first.root, type: first.type }
+            if (first.bass) currentChord.bass = first.bass
+            if (first.nashville) currentChord.nashville = true
+          }
         } else if (tok.type === 'BAR_LINE') {
           const bar = { column: tok.column }
           if (currentChord) bar.chord = currentChord
@@ -292,11 +396,19 @@ function parseChordLyricBlock(text) {
       i++
       // Find the paired lyric line (next line that isn't a chord line)
       let lyricLine = ''
-      if (i < rawLines.length && !isChordLine(rawLines[i])) {
-        lyricLine = rawLines[i]
-        i++
+      if (i < rawLines.length) {
+        // When pendingSplit would be set, also check continueSplit before treating as lyrics
+        const nextIsChord = scanChordLine(rawLines[i])
+        if (!nextIsChord) {
+          // Also check if it's a split continuation line
+          if (!splitOpenToken || !scanChordLine(rawLines[i], { continueSplit: true })) {
+            lyricLine = rawLines[i]
+            i++
+          }
+        }
       }
 
+      const allChordsStartIndex = allChords.length
       allChords.push(...chords.map(c => {
         const ch = { root: c.root, type: c.type }
         if (c.bass) ch.bass = c.bass
@@ -309,12 +421,24 @@ function parseChordLyricBlock(text) {
       }))
       if (lyricLine) allLyrics.push(lyricLine)
 
-      lines.push({
+      const lineData = {
         chords,
         barLines,
         lyrics: lyricLine,
         characters: buildCharacterAlignment(chordTokens, lyricLine),
-      })
+      }
+      lines.push(lineData)
+
+      // If we found a SPLIT_OPEN, set up pendingSplit for cross-line merging
+      if (splitOpenToken) {
+        const splitChordIndex = chords.length - 1 // the split chord is the last one we added
+        pendingSplit = {
+          lineData,
+          chordIndex: splitChordIndex,
+          allChordsIndex: allChordsStartIndex + splitChordIndex,
+          openChords: splitOpenToken.chords,
+        }
+      }
     } else {
       // Lyric-only line (no chord line above it)
       if (line.trim().length > 0) {

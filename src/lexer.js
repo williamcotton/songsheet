@@ -62,12 +62,48 @@ const DECORATOR_STOP_CHARS = new Set(['>', ']', '!'])
  *
  * A chord line must contain at least one chord, and every non-whitespace
  * token must parse as a valid chord, decorator, or `|`.
+ *
+ * Options:
+ *   continueSplit: true — line is a continuation of a cross-line split measure.
+ *     Pre-scans for chords before `]`, emits SPLIT_CLOSE, then continues normal scanning.
  */
-export function scanChordLine(line) {
+export function scanChordLine(line, options = {}) {
   if (!line || line.trim().length === 0) return null
 
   const tokens = []
   let i = 0
+
+  // When continueSplit is set, we expect chords followed by `]` at the start of the line
+  if (options.continueSplit) {
+    const closeChords = []
+    // scan for chords before `]`
+    while (i < line.length && line[i] !== ']') {
+      if (line[i] === ' ' || line[i] === '\t') { i++; continue }
+      const result = parseChordAt(line, i, DECORATOR_STOP_CHARS)
+      if (!result) return null // non-chord content before ] means not a valid continuation
+      closeChords.push(result.token)
+      i = result.end
+    }
+    if (i >= line.length || line[i] !== ']') return null // no ] found
+    if (closeChords.length === 0) return null // must have at least one chord
+    const column = closeChords[0].column
+    i++ // consume ]
+    // next char must be whitespace, end-of-line, or |
+    if (i < line.length && line[i] !== ' ' && line[i] !== '\t' && line[i] !== '|') {
+      return null
+    }
+    tokens.push({
+      type: 'SPLIT_CLOSE',
+      column,
+      chords: closeChords.map(c => {
+        const sc = { root: c.root, type: c.quality }
+        if (c.bass) sc.bass = c.bass
+        if (c.nashville) sc.nashville = true
+        return sc
+      }),
+    })
+    // continue scanning the rest of the line normally
+  }
 
   while (i < line.length) {
     // skip whitespace
@@ -125,6 +161,7 @@ export function scanChordLine(line) {
 
     // split measure: [chord chord ...]
     if (line[i] === '[') {
+      const openColumn = column
       i++ // consume [
       const chords = []
       while (i < line.length && line[i] !== ']') {
@@ -134,7 +171,27 @@ export function scanChordLine(line) {
         chords.push(result.token)
         i = result.end
       }
-      if (i >= line.length || line[i] !== ']') return null
+      if (i >= line.length) {
+        // No ] found — this is a cross-line split open
+        if (chords.length < 1) return null // need at least 1 chord after [
+        const first = chords[0]
+        const token = {
+          type: 'SPLIT_OPEN',
+          column: openColumn,
+          root: first.root,
+          quality: first.quality,
+          chords: chords.map(c => {
+            const sc = { root: c.root, type: c.quality }
+            if (c.bass) sc.bass = c.bass
+            if (c.nashville) sc.nashville = true
+            return sc
+          }),
+        }
+        if (first.bass) token.bass = first.bass
+        if (first.nashville) token.nashville = true
+        tokens.push(token)
+        continue
+      }
       i++ // consume ]
       if (chords.length < 2) return null
       // next char must be whitespace, end-of-line, or |
@@ -145,7 +202,7 @@ export function scanChordLine(line) {
       const first = chords[0]
       const token = {
         type: 'CHORD',
-        column,
+        column: openColumn,
         root: first.root,
         quality: first.quality,
         splitMeasure: chords.map(c => {
